@@ -1,0 +1,32 @@
+{
+  "name": "topocache",
+  "version": "0.0.0",
+  "description": "caching tool built on l(evel)t(opo)sort",
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "coffee --map -o lib -c src",
+    "push": "doctoc README.md && git add . && git commit -m'update' && git push",
+    "pub": "npm run build && npm run push && npm version patch && npm publish",
+    "test": "npm run build && node lib/tests.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/loveencounterflow/topocache.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loveencounterflow/topocache/issues"
+  },
+  "homepage": "https://github.com/loveencounterflow/topocache",
+  "keywords": [
+    "cache",
+    "toposort"
+  ],
+  "author": "loveencounterflow",
+  "license": "MIT",
+  "dependencies": {
+    "cnd": "^4.2.0",
+    "coffee-script": "^1.11.1",
+    "coffeenode-suspend": "^0.1.11",
+    "ltsort": "^1.1.5"
+  }
+}
