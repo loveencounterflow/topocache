@@ -63,6 +63,16 @@ stampers =
   #---------------------------------------------------------------------------------------------------------
   # method:
 
+#-----------------------------------------------------------------------------------------------------------
+@_shell = ( command, handler ) ->
+  # command       = 'ls -AlF'
+  settings =
+    cwd:      PATH.resolve __dirname, '..'
+    encoding: 'utf-8'
+  CP.exec command, settings, ( error, stdout, stderr ) ->
+    return handler error if error?
+    return handler null, stdout, stderr
+
 
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
@@ -102,7 +112,8 @@ stampers =
   rc_key                  = @_get_rc_key me, precedent_url, consequent_url
   me[ 'fixes' ][ rc_key ] = fix
   LTSORT.add me[ 'graph' ], precedent_url, consequent_url
-  return @_reset_chart me
+  @_reset_chart me
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @get_fix = ( me, precedent, consequent, fallback ) ->
@@ -126,39 +137,40 @@ stampers =
 @URL = {}
 
 #-----------------------------------------------------------------------------------------------------------
-@URL.join = ( me, protocol, payload = null ) =>
-  unless payload?
-    payload   = protocol
+@URL.join = ( me, protocol, path = null ) =>
+  unless path?
+    path      = protocol
     protocol  = 'file'
   if ( anchor = me[ 'anchors' ][ protocol ] )?
     ### TAINT consider to use other methods for other protocols ###
     ### TAINT consider to only use after testing for being a relative path ###
-    payload = PATH.resolve anchor, payload
-  return URL.format { protocol, slashes: yes, pathname: payload, }
+    path = PATH.relative anchor, PATH.resolve anchor, path
+  return URL.format { protocol, slashes: yes, pathname: path, }
 
 #-----------------------------------------------------------------------------------------------------------
 @URL.split = ( me, url ) =>
   R         = URL.parse url, no, no
   protocol  = R[ 'protocol' ].replace /:$/g, ''
-  payload   = QUERYSTRING.unescape R[ 'pathname' ]
-  # payload   = payload.replace /^\//g, ''
-  return [ protocol, payload, ]
+  path      = QUERYSTRING.unescape R[ 'pathname' ]
+  # path   = path.replace /^\//g, ''
+  return [ protocol, path, ]
 
 #-----------------------------------------------------------------------------------------------------------
 @URL.anchor = ( me, protocol, path ) =>
   ### Anchors are reference points so you can use relative paths to files and web addresses. ###
   switch protocol
     when 'file'
-      me[ 'anchors' ][ protocol ] = path ? process.cwd()
+      R = me[ 'anchors' ][ protocol ] = path ? process.cwd()
     else
-      throw new Error "uanble to set anchor for protocol #{rpr protocol}"
-  return null
+      throw new Error "unable to set anchor for protocol #{rpr protocol}"
+  return R
 
 
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
 @timestamp_from_url = ( me, url, handler ) ->
+  ### TAINT use URLs as keys into info objects to avoid repeated parsing ###
   [ protocol, path, ] = @URL.split me, url
   stamper             = me[ 'stampers' ][ protocol ]
   return handler new Error "no stamper for protocol #{rpr protocol}" unless stamper?
@@ -180,7 +192,6 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
-  ### TAINT relies on FS ###
   if ( Z = me[ 'boxed-trend' ] )?
     setImmediate -> handler null, Z
     return null
@@ -188,8 +199,9 @@ stampers =
   step ( resume ) =>
     Z         = []
     collector = {}
-    cache_entries = yield FS.fetch_cache resume
-    ( collector[ entry.t ] ?= [] ).push name for name, entry of cache_entries
+    for url of @get_indexed_chart me
+      t = yield @timestamp_from_url me, url, resume
+      ( collector[ t ] ?= [] ).push url
     Z.push collector[ t ] for t in ( Object.keys collector ).sort()
     handler null, me[ 'boxed-trend' ] = Z
   #.........................................................................................................
@@ -269,7 +281,6 @@ stampers =
     return null
   #.........................................................................................................
   return null
-
 
 
 
