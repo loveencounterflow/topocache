@@ -2,8 +2,6 @@
 
 
 ############################################################################################################
-# PATH                      = require 'path'
-#...........................................................................................................
 CND                       = require 'cnd'
 rpr                       = CND.rpr
 badge                     = 'TOPOCACHE/DEMO'
@@ -16,6 +14,7 @@ urge                      = CND.get_logger 'urge',      badge
 whisper                   = CND.get_logger 'whisper',   badge
 echo                      = CND.echo.bind CND
 #...........................................................................................................
+PATH                      = require 'path'
 test                      = require 'guy-test'
 TC                        = require './main'
 LTSORT                    = require 'ltsort'
@@ -23,102 +22,90 @@ LTSORT                    = require 'ltsort'
 resolve                   = ( require 'path' ).resolve
 
 
-#===========================================================================================================
-# FILE SYSTEM SIMULATOR
-#-----------------------------------------------------------------------------------------------------------
-FS        = {}
-FS._t     = 1000
-FS.cache  = {}
+# #===========================================================================================================
+# # FILE SYSTEM SIMULATOR
+# #-----------------------------------------------------------------------------------------------------------
+# FS        = {}
+# FS._t     = 1000
+# FS.cache  = {}
 
-#-----------------------------------------------------------------------------------------------------------
-FS._now = ->
-  return @_t += +1
+# #-----------------------------------------------------------------------------------------------------------
+# FS._now = ->
+#   return @_t += +1
 
-#-----------------------------------------------------------------------------------------------------------
-FS.write = ( name, value ) ->
-  t = @_now()
-  @cache[ name ] = { t, value, }
-  return value
+# #-----------------------------------------------------------------------------------------------------------
+# FS.write = ( name, value ) ->
+#   t = @_now()
+#   @cache[ name ] = { t, value, }
+#   return value
 
-#-----------------------------------------------------------------------------------------------------------
-FS.read = ( name ) ->
-  return undefined unless ( R = FS.cache[ name ] )?
-  return R.value
+# #-----------------------------------------------------------------------------------------------------------
+# FS.read = ( name ) ->
+#   return undefined unless ( R = FS.cache[ name ] )?
+#   return R.value
 
-#-----------------------------------------------------------------------------------------------------------
-FS.read_json = ( name ) ->
-  json = @read name
-  try
-    return JSON.parse json
-  catch error
-    warn "invalid JSON for #{rpr name}: #{rpr json}"
-    throw error
+# #-----------------------------------------------------------------------------------------------------------
+# FS.read_json = ( name ) ->
+#   json = @read name
+#   try
+#     return JSON.parse json
+#   catch error
+#     warn "invalid JSON for #{rpr name}: #{rpr json}"
+#     throw error
 
-#-----------------------------------------------------------------------------------------------------------
-FS.write_json = ( name, value ) -> @write name, JSON.stringify value
+# #-----------------------------------------------------------------------------------------------------------
+# FS.write_json = ( name, value ) -> @write name, JSON.stringify value
 
-#-----------------------------------------------------------------------------------------------------------
-FS.fetch_cache = ( handler ) ->
-  setImmediate => handler null, @cache
-  return null
+# #-----------------------------------------------------------------------------------------------------------
+# FS.fetch_cache = ( handler ) ->
+#   setImmediate => handler null, @cache
+#   return null
 
-XXX = {}
+# XXX = {}
 
-#-----------------------------------------------------------------------------------------------------------
-XXX.cmp = ( name_a, name_b ) ->
-  throw new Error "unknown name #{rpr name_a}" unless ( entry_a = FS.cache[ name_a ] )?
-  throw new Error "unknown name #{rpr name_b}" unless ( entry_b = FS.cache[ name_b ] )?
-  return -1 if entry_a.t < entry_b.t
-  return +1 if entry_a.t > entry_b.t
-  return  0
+# #-----------------------------------------------------------------------------------------------------------
+# XXX.cmp = ( name_a, name_b ) ->
+#   throw new Error "unknown name #{rpr name_a}" unless ( entry_a = FS.cache[ name_a ] )?
+#   throw new Error "unknown name #{rpr name_b}" unless ( entry_b = FS.cache[ name_b ] )?
+#   return -1 if entry_a.t < entry_b.t
+#   return +1 if entry_a.t > entry_b.t
+#   return  0
 
-#-----------------------------------------------------------------------------------------------------------
-XXX.test_cromulence = ( reference, comparators... ) ->
-  throw new Error "need at least one comparator, got none" unless comparators.length > 0
-  for comparator in comparators
-    return false if ( @cmp reference, comparator ) < 0
-  return true
+# #-----------------------------------------------------------------------------------------------------------
+# XXX.test_cromulence = ( reference, comparators... ) ->
+#   throw new Error "need at least one comparator, got none" unless comparators.length > 0
+#   for comparator in comparators
+#     return false if ( @cmp reference, comparator ) < 0
+#   return true
 
+f = ->
+  FS = require 'fs'
 
+f.apply TC
 
 #-----------------------------------------------------------------------------------------------------------
 main = ->
   step ( resume ) ->
-    #.......................................................................................................
-    paths =
-      f_coffee_template:  'test-data/templates/f.coffee'
-      a_json_template:    'test-data/templates/a.json'
-      f_coffee:           'test-data/f.coffee'
-      f_js:               'test-data/f.js'
-      a_json:             'test-data/a.json'
-    #.......................................................................................................
     g = TC.new_cache()
-    debug '50900', g
-    debug '44402', TC.URL.from_path g, 'foo'
-    debug '44402', TC.URL.from_path g, 'file', 'foo'
-    debug '44402', TC.URL.from_path g, 'file', '../foo'
-    debug '44402', TC.URL.from_path g, 'cache', 'foo'
-    debug '44402', TC.URL.from_path g, 'test-data/f.template.coffee'
-    debug '44402', TC.URL.from_path g, 'test-data/f.coffee'
-    debug '44402', TC.URL.from_path g, 'test-data/f.js'
-    debug '44402', TC.URL.from_path g, 'test-data/a.template.json'
-    debug '44402', TC.URL.from_path g, 'test-data/a.json'
-    return
+    TC.URL.anchor g, 'file', PATH.resolve __dirname, '..'
     #.......................................................................................................
     urls =
-      f_coffee_template:  TC.URL.from_path g, 'file', paths.f_coffee_template
-      f_coffee:           TC.URL.from_path g, 'file', paths.f_coffee
-      f_js:               TC.URL.from_path g, 'file', paths.f_js
-      a_json_template:    TC.URL.from_path g, 'file', paths.a_json_template
-      a_json:             TC.URL.from_path g, 'file', paths.a_json
-      f_cache:            TC.URL.from_path g, 'cache', 'f'
-    debug paths
-    debug urls
+      f_coffee_template:  TC.URL.join g, 'test-data/templates/f.coffee'
+      a_json_template:    TC.URL.join g, 'test-data/templates/a.json'
+      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'test-data/f.js'
+      a_json:             TC.URL.join g, 'test-data/a.json'
+      cache_f:            TC.URL.join g, 'cache', 'foo'
+    #.......................................................................................................
+    help yield TC.timestamp_from_url g, urls.f_coffee_template, resume
+    help yield TC.timestamp_from_url g, urls.f_coffee, resume
     #.......................................................................................................
     TC.register g, urls.f_coffee, urls.f_js,    [ 'bash',   'coffee -o lib -c src', ]
     TC.register g, urls.f_js,     urls.f_cache, [ 'advice', 'recalculate',          ]
     TC.register g, urls.a_json,   urls.f_cache, [ 'advice', 'recalculate',          ]
-    # debug '78777', g
+    debug '78777', g
+    help TC.get_boxed_chart g
+    return
     #.......................................................................................................
     FS.write_json urls.a_json,   { x: 42, }
     FS.write      urls.f_coffee, "### some CS here ###"

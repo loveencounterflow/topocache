@@ -32,20 +32,23 @@ stampers =
 
   #---------------------------------------------------------------------------------------------------------
   file:
-    #.......................................................................................................
-    get_timestamp: ( path ) =>
-      ### TAINT return special value when file doesn't exist ###
-      nfo = FS.statSync path
-      return +nfo[ 'mtime' ]
+    # #.......................................................................................................
+    # get_timestamp: ( path ) =>
+    #   ### TAINT return special value when file doesn't exist ###
+    #   nfo = FS.statSync path
+    #   return +nfo[ 'mtime' ]
 
     #.......................................................................................................
     fetch_timestamp: ( path, handler ) =>
       step ( resume ) =>
         try
-          stat = yield FS.stat path
+          stat  = yield FS.stat path, resume
+          Z     = +stat[ 'mtime' ]
         catch error
-          return handler error
-        handler null, +nfo[ 'mtime' ]
+          throw error unless error[ 'code' ] is 'ENOENT'
+          ### TAINT use special value to signal file missing ###
+          Z = null
+        handler null, Z
 
   #---------------------------------------------------------------------------------------------------------
   coffee:
@@ -74,7 +77,7 @@ stampers =
     'anchors':    {}
   @_reset_chart R
   @_reset_trend R
-  @add_anchor R, 'file'
+  @URL.anchor R, 'file'
   return R
 
 #-----------------------------------------------------------------------------------------------------------
@@ -89,23 +92,13 @@ stampers =
   me[ 'indexed-trend' ] = null
   return me
 
-#-----------------------------------------------------------------------------------------------------------
-@add_anchor = ( me, protocol, path ) ->
-  ### Anchors are reference points so you can use relative paths to files and web addresses. ###
-  switch protocol
-    when 'file'
-      me[ 'anchors' ][ protocol ] = path ? process.cwd()
-    else
-      throw new Error "uanble to set anchor for protocol #{rpr protocol}"
-  return null
-
 
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
 @register = ( me, precedent, consequent, fix ) ->
-  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.from_path me,  precedent... ) else  precedent
-  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.from_path me, consequent... ) else consequent
+  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.join me,  precedent... ) else  precedent
+  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.join me, consequent... ) else consequent
   rc_key                  = @_get_rc_key me, precedent_url, consequent_url
   me[ 'fixes' ][ rc_key ] = fix
   LTSORT.add me[ 'graph' ], precedent_url, consequent_url
@@ -113,8 +106,8 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @get_fix = ( me, precedent, consequent, fallback ) ->
-  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.from_path me,  precedent... ) else  precedent
-  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.from_path me, consequent... ) else consequent
+  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.join me,  precedent... ) else  precedent
+  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.join me, consequent... ) else consequent
   rc_key                  = @_get_rc_key me, precedent_url, consequent_url
   unless ( R = me[ 'fixes' ][ rc_key ] )?
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
@@ -133,7 +126,7 @@ stampers =
 @URL = {}
 
 #-----------------------------------------------------------------------------------------------------------
-@URL.from_path = ( me, protocol, payload = null ) =>
+@URL.join = ( me, protocol, payload = null ) =>
   unless payload?
     payload   = protocol
     protocol  = 'file'
@@ -144,11 +137,32 @@ stampers =
   return URL.format { protocol, slashes: yes, pathname: payload, }
 
 #-----------------------------------------------------------------------------------------------------------
-@URL.from_url = ( me, url ) =>
+@URL.split = ( me, url ) =>
   R         = URL.parse url, no, no
   protocol  = R[ 'protocol' ].replace /:$/g, ''
-  payload   = ( QUERYSTRING.unescape R[ 'pathname' ] ).replace /^\//g, ''
+  payload   = QUERYSTRING.unescape R[ 'pathname' ]
+  # payload   = payload.replace /^\//g, ''
   return [ protocol, payload, ]
+
+#-----------------------------------------------------------------------------------------------------------
+@URL.anchor = ( me, protocol, path ) =>
+  ### Anchors are reference points so you can use relative paths to files and web addresses. ###
+  switch protocol
+    when 'file'
+      me[ 'anchors' ][ protocol ] = path ? process.cwd()
+    else
+      throw new Error "uanble to set anchor for protocol #{rpr protocol}"
+  return null
+
+
+#===========================================================================================================
+#
+#-----------------------------------------------------------------------------------------------------------
+@timestamp_from_url = ( me, url, handler ) ->
+  [ protocol, path, ] = @URL.split me, url
+  stamper             = me[ 'stampers' ][ protocol ]
+  return handler new Error "no stamper for protocol #{rpr protocol}" unless stamper?
+  stamper.fetch_timestamp path, handler
 
 
 #===========================================================================================================
