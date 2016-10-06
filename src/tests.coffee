@@ -107,6 +107,8 @@ CP                        = require 'child_process'
     urge '55444', boxed_chart
     # T.eq boxed_chart, [ [ 'file:///home/flow/io/mingkwai-rack/topocache/test-data/f.coffee' ], [ 'file:///home/flow/io/mingkwai-rack/topocache/test-data/f.js' ] ]
     urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
+    warn yield TC.find_first_fault  g, resume
+    urge yield TC.find_faults       g, resume
     # T.eq g[ 'anchors' ][ 'file' ], __dirname
     done()
 

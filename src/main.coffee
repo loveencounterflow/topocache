@@ -269,7 +269,7 @@ stampers =
           entry =
             reference:  ref_name
             comparison: cmp_name
-            fix:        TC.get_fix me, cmp_name, ref_name, null
+            fix:        @get_fix me, cmp_name, ref_name, null
           #.................................................................................................
           if first_only
             handler null, entry
