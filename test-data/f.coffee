@@ -1,4 +1,5 @@
 
+console.log 'loaded:', __filename
 
 FS = require 'fs'
 TC = require '..'
