@@ -166,6 +166,16 @@ CP                        = require 'child_process'
   #.........................................................................................................
   done()
 
+#-----------------------------------------------------------------------------------------------------------
+@[ "only file URLs are relativized / absolutized" ] = ( T, done ) ->
+  g               = TC.new_cache()
+  TC.URL.set_anchor g, 'file', anchor if anchor?
+  T.eq ( TC.URL.join  g,                 [ 'bash', 'coffee -c test-data', ]... ), 'bash:///~coffee -c test-data'
+  T.eq ( TC.URL.split g, TC.URL.join g,  [ 'bash', 'coffee -c test-data', ]... ), [ 'bash', 'coffee -c test-data', ]
+  #.........................................................................................................
+  done()
+
+
 
 ############################################################################################################
 unless module.parent?
@@ -175,6 +185,7 @@ unless module.parent?
     "can not set anchor after adding dependencies"
     "relative paths are roundtrip-invariant"
     "file URLs are roundtrip-invariant"
+    "only file URLs are relativized / absolutized"
     ]
   @_prune()
   @_main()
@@ -185,14 +196,14 @@ unless module.parent?
   # @[ "demo" ] null, -> warn "not tested"
 
 
-  debug PATH.resolve '/here', '/there'
-  debug PATH.resolve '/here', 'there'
-  debug PATH.resolve '', '/there'
-  debug PATH.resolve '', 'there'
-  debug PATH.resolve ''
-  debug PATH.resolve '.'
-  debug PATH.resolve '..'
-  debug PATH.resolve 'foo/../bar'
-  debug PATH.resolve()
-
+  # debug PATH.resolve '/here', '/there'
+  # debug PATH.resolve '/here', 'there'
+  # debug PATH.resolve '', '/there'
+  # debug PATH.resolve '', 'there'
+  # debug PATH.resolve ''
+  # debug PATH.resolve '.'
+  # debug PATH.resolve '..'
+  # debug PATH.resolve 'foo/../bar'
+  # debug PATH.resolve()
+  # g = TC.new_cache()
 

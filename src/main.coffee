@@ -161,8 +161,10 @@ stampers =
   path      = QUERYSTRING.unescape R[ 'pathname' ]
   path      = path.replace /^\/~/g, ''
   # path   = path.replace /^\//g, ''
-  ### TAINT may want to treat anchor differently, ignore this step for some protocols ###
-  path      = PATH.resolve ( me[ 'anchors' ][ protocol ] ? '.' ), path
+  #.........................................................................................................
+  switch protocol
+    when 'file' then path = PATH.resolve ( me[ 'anchors' ][ protocol ] ? '.' ), path
+  #.........................................................................................................
   return [ protocol, path, ]
 
 #-----------------------------------------------------------------------------------------------------------
