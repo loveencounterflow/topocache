@@ -24,6 +24,7 @@ FS                        = require 'fs'
 test_data_home            = PATH.resolve __dirname, '../test-data'
 templates_home            = PATH.resolve test_data_home, 'templates'
 # test_filenames            = [ 'f.coffee', 'f.js', 'a.json', ]
+touch                     = require 'touch'
 CP                        = require 'child_process'
 
 
@@ -46,6 +47,9 @@ CP                        = require 'child_process'
       copied #{byte_count} bytes
       from #{source_path}
       to   #{target_path}"""
+
+#-----------------------------------------------------------------------------------------------------------
+@_touch_sync = ( path ) -> touch.sync path, { mtime: true, }
 
 #-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
@@ -175,6 +179,38 @@ CP                        = require 'child_process'
   #.........................................................................................................
   done()
 
+#-----------------------------------------------------------------------------------------------------------
+@[ "find fault(s) (simple case)" ] = ( T, done ) ->
+  step ( resume ) =>
+    @_procure_test_files()
+    @_touch_sync PATH.resolve __dirname, '../test-data/f.js'
+    # @_touch_sync PATH.resolve __dirname, '../test-data/f.coffee'
+    #.......................................................................................................
+    g           = TC.new_cache()
+    home        = PATH.resolve __dirname, '..'
+    TC.URL.set_anchor g, 'file', home
+    #.......................................................................................................
+    urls =
+      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'test-data/f.js'
+    #.......................................................................................................
+    TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
+    boxed_chart =         TC.get_boxed_chart g
+    boxed_trend = yield TC.fetch_boxed_trend g, resume
+    first_fault = yield TC.find_first_fault  g, resume
+    faults      = yield TC.find_faults       g, resume
+    urge JSON.stringify boxed_chart
+    urge JSON.stringify boxed_trend
+    urge JSON.stringify first_fault
+    urge JSON.stringify faults
+    T.eq boxed_chart, [["file:///~test-data/f.coffee"],["file:///~test-data/f.js"]]
+    T.eq boxed_trend, [["file:///~test-data/f.js"],["file:///~test-data/f.coffee"]]
+    T.eq first_fault, {"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}
+    T.eq faults,      [{"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}]
+    # warn first_fault
+    # urge faults
+    done()
+
 
 
 ############################################################################################################
@@ -186,6 +222,7 @@ unless module.parent?
     "relative paths are roundtrip-invariant"
     "file URLs are roundtrip-invariant"
     "only file URLs are relativized / absolutized"
+    "find fault(s) (simple case)"
     ]
   @_prune()
   @_main()
@@ -206,4 +243,5 @@ unless module.parent?
   # debug PATH.resolve 'foo/../bar'
   # debug PATH.resolve()
   # g = TC.new_cache()
+  # help TC.URL.join g, [ 'file', ( ( require 'querystring' ).escape 'foo/bar/baz.js' ), ]...
 
