@@ -77,9 +77,8 @@ CP                        = require 'child_process'
 @[ "create cache object" ] = ( T, done ) ->
   g           = TC.new_cache()
   home        = PATH.resolve __dirname, '..'
-  file_anchor = TC.URL.anchor g, 'file', home
+  TC.URL.set_anchor g, 'file', home
   T.eq g[ 'anchors' ][ 'file' ],  home
-  T.eq file_anchor,               home
   done()
 
 #-----------------------------------------------------------------------------------------------------------
@@ -89,28 +88,83 @@ CP                        = require 'child_process'
     #.......................................................................................................
     g           = TC.new_cache()
     home        = PATH.resolve __dirname, '..'
-    file_anchor = TC.URL.anchor g, 'file', home
+    TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
     urls =
-    #   f_coffee_template:  TC.URL.join g, 'test-data/templates/f.coffee'
-    #   a_json_template:    TC.URL.join g, 'test-data/templates/a.json'
       f_coffee:           TC.URL.join g, 'test-data/f.coffee'
       f_js:               TC.URL.join g, 'test-data/f.js'
-    #   a_json:             TC.URL.join g, 'test-data/a.json'
-    #   cache_f:            TC.URL.join g, 'cache', 'foo'
-    # #.......................................................................................................
-    # help yield TC.timestamp_from_url g, urls.f_coffee_template, resume
-    # help yield TC.timestamp_from_url g, urls.f_coffee, resume
-    # #.......................................................................................................
+    #.......................................................................................................
     TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
     boxed_chart = TC.get_boxed_chart g
     urge '55444', boxed_chart
-    # T.eq boxed_chart, [ [ 'file:///home/flow/io/mingkwai-rack/topocache/test-data/f.coffee' ], [ 'file:///home/flow/io/mingkwai-rack/topocache/test-data/f.js' ] ]
     urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
     warn yield TC.find_first_fault  g, resume
     urge yield TC.find_faults       g, resume
-    # T.eq g[ 'anchors' ][ 'file' ], __dirname
     done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "can not set anchor after adding dependencies" ] = ( T, done ) ->
+  g           = TC.new_cache()
+  TC.register g, 'file:///test-data/f.coffee', 'file:///test-data/f.js', [ 'bash', 'coffee -c test-data', ]
+  T.throws "unable to set anchor after adding dependency", -> TC.URL.set_anchor g, 'file', '/baz'
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "relative paths are roundtrip-invariant" ] = ( T, done ) ->
+  g           = TC.new_cache()
+  #.........................................................................................................
+  probes = [
+    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
+    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
+    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
+    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
+    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
+    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
+    ]
+  #.........................................................................................................
+  for { anchor, path_1, } in probes
+    is_absolute = path_1.startsWith '/'
+    rel_path    = TC.URL._get_relative_path null, anchor, path_1
+    path_2      = TC.URL._get_absolute_path null, anchor, rel_path
+    path_2      = PATH.relative anchor, path_2 unless is_absolute
+    #.......................................................................................................
+    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green rel_path ), ( CND.steel path_2 )
+    # help '77687', rel_path
+    # warn '77687', path_2
+    T.eq path_1, path_2
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "file URLs are roundtrip-invariant" ] = ( T, done ) ->
+  implicit_anchor = PATH.resolve '.'
+  #.........................................................................................................
+  probes = [
+    { anchor: '/somewhere',   path_1: 'foo',            }
+    { anchor: '/somewhere',   path_1: '/foo',           }
+    { anchor: null,           path_1: 'foo',            }
+    { anchor: null,           path_1: '/foo',           }
+    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
+    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
+    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
+    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
+    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
+    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
+    ]
+  #.........................................................................................................
+  for { anchor, path_1, matcher, } in probes
+    g               = TC.new_cache()
+    TC.URL.set_anchor g, 'file', anchor if anchor?
+    is_relative     = not path_1.startsWith '/'
+    url             = TC.URL.join g, path_1
+    [ _, path_2, ]  = TC.URL.split g, url
+    matcher         = PATH.resolve ( anchor ? implicit_anchor ), path_1
+    #.......................................................................................................
+    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green url ), ( CND.steel path_2 )
+    # debug '77687', JSON.stringify { anchor, path_1, matcher: path_2, }
+    T.eq path_2, matcher
+  #.........................................................................................................
+  done()
 
 
 ############################################################################################################
@@ -118,12 +172,27 @@ unless module.parent?
   include = [
     "create cache object"
     "register file objects"
+    "can not set anchor after adding dependencies"
+    "relative paths are roundtrip-invariant"
+    "file URLs are roundtrip-invariant"
     ]
-  # @_prune()
+  @_prune()
   @_main()
 
   # debug '5562', JSON.stringify key for key in Object.keys @
 
   # CND.run =>
   # @[ "demo" ] null, -> warn "not tested"
+
+
+  debug PATH.resolve '/here', '/there'
+  debug PATH.resolve '/here', 'there'
+  debug PATH.resolve '', '/there'
+  debug PATH.resolve '', 'there'
+  debug PATH.resolve ''
+  debug PATH.resolve '.'
+  debug PATH.resolve '..'
+  debug PATH.resolve 'foo/../bar'
+  debug PATH.resolve()
+
 

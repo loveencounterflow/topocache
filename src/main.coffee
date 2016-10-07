@@ -52,10 +52,10 @@ stampers =
 
   #---------------------------------------------------------------------------------------------------------
   coffee:
-    fix: ( precedent_path, consequent_path ) =>
+    fix: ( cause_path, effect_path ) =>
       ### TAINT do we need sync & async fixing? signature? ###
       R = null
-      js_source = CS.compile wrapped_source, { bare: no, filename: precedent_path, }
+      js_source = CS.compile wrapped_source, { bare: no, filename: cause_path, }
       return R
 
   #---------------------------------------------------------------------------------------------------------
@@ -87,7 +87,6 @@ stampers =
     'anchors':    {}
   @_reset_chart R
   @_reset_trend R
-  @URL.anchor R, 'file'
   return R
 
 #-----------------------------------------------------------------------------------------------------------
@@ -102,39 +101,46 @@ stampers =
   me[ 'indexed-trend' ] = null
   return me
 
+#-----------------------------------------------------------------------------------------------------------
+@_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
+
 
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-@register = ( me, precedent, consequent, fix ) ->
-  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.join me,  precedent... ) else  precedent
-  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.join me, consequent... ) else consequent
-  rc_key                  = @_get_rc_key me, precedent_url, consequent_url
+@register = ( me, cause, effect, fix ) ->
+  cause_url     = if ( CND.isa_list  cause ) then ( @URL.join me,  cause... ) else  cause
+  effect_url    = if ( CND.isa_list effect ) then ( @URL.join me, effect... ) else effect
+  rc_key                  = @_get_rc_key me, cause_url, effect_url
   me[ 'fixes' ][ rc_key ] = fix
-  LTSORT.add me[ 'graph' ], precedent_url, consequent_url
+  LTSORT.add me[ 'graph' ], cause_url, effect_url
   @_reset_chart me
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@get_fix = ( me, precedent, consequent, fallback ) ->
-  precedent_url     = if ( CND.isa_list  precedent ) then ( @URL.join me,  precedent... ) else  precedent
-  consequent_url    = if ( CND.isa_list consequent ) then ( @URL.join me, consequent... ) else consequent
-  rc_key                  = @_get_rc_key me, precedent_url, consequent_url
+@get_fix = ( me, cause, effect, fallback ) ->
+  cause_url     = if ( CND.isa_list  cause ) then ( @URL.join me,  cause... ) else  cause
+  effect_url    = if ( CND.isa_list effect ) then ( @URL.join me, effect... ) else effect
+  rc_key                  = @_get_rc_key me, cause_url, effect_url
   unless ( R = me[ 'fixes' ][ rc_key ] )?
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
     R = fallback
   return R
 
 #-----------------------------------------------------------------------------------------------------------
-@_get_rc_key = ( me, precedent, consequent ) ->
+@_get_rc_key = ( me, cause, effect ) ->
   ### TAINT use URLs for RC key as well ###
-  return "#{consequent} -> #{precedent}"
+  return "#{effect} -> #{cause}"
 
 
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
 @URL = {}
+
+#-----------------------------------------------------------------------------------------------------------
+@URL._get_relative_path = ( me, anchor, path ) -> PATH.relative anchor, PATH.resolve anchor, path
+@URL._get_absolute_path = ( me, anchor, path ) -> PATH.resolve anchor, path
 
 #-----------------------------------------------------------------------------------------------------------
 @URL.join = ( me, protocol, path = null ) =>
@@ -145,6 +151,7 @@ stampers =
     ### TAINT consider to use other methods for other protocols ###
     ### TAINT consider to only use after testing for being a relative path ###
     path = PATH.relative anchor, PATH.resolve anchor, path
+  path = '~' + path
   return URL.format { protocol, slashes: yes, pathname: path, }
 
 #-----------------------------------------------------------------------------------------------------------
@@ -152,18 +159,24 @@ stampers =
   R         = URL.parse url, no, no
   protocol  = R[ 'protocol' ].replace /:$/g, ''
   path      = QUERYSTRING.unescape R[ 'pathname' ]
+  path      = path.replace /^\/~/g, ''
   # path   = path.replace /^\//g, ''
+  ### TAINT may want to treat anchor differently, ignore this step for some protocols ###
+  path      = PATH.resolve ( me[ 'anchors' ][ protocol ] ? '.' ), path
   return [ protocol, path, ]
 
 #-----------------------------------------------------------------------------------------------------------
-@URL.anchor = ( me, protocol, path ) =>
+@URL.set_anchor = ( me, protocol, anchor ) =>
   ### Anchors are reference points so you can use relative paths to files and web addresses. ###
+  throw new Error "need anchor, got #{rpr anchor}" unless anchor?
+  throw new Error "unable to reset anchor for protocol #{rpr protocol}" if me[ 'anchors' ][ protocol ]?
+  throw new Error "unable to set anchor after adding dependency" unless @_is_fresh me
   switch protocol
     when 'file'
-      R = me[ 'anchors' ][ protocol ] = path ? process.cwd()
+      me[ 'anchors' ][ protocol ] = anchor
     else
       throw new Error "unable to set anchor for protocol #{rpr protocol}"
-  return R
+  return null
 
 
 #===========================================================================================================
@@ -256,8 +269,7 @@ stampers =
         continue
       #.....................................................................................................
       for cmp_name, cmp_charting_idx of indexed_chart
-        ### Skip entries that have the same or smaller charting index (that are not depenedent on
-        reference): ###
+        ### Skip entries with same or smaller charting index (that do not depend on reference): ###
         continue if ref_charting_idx <= cmp_charting_idx
         unless ( cmp_trending_idx = indexed_trend[ cmp_name ] )?
           warn_missing cmp_name

@@ -50,3 +50,27 @@ fault: a mismatch between the ordering relations between a reference entry and a
 
 * [ ] use URLs like `file:///home/url.json`, `cache://foo`
 
+```
+ causal          temporal
+  |                 |
+  o cause   ---     o precedent
+  |                 |
+  o effect  ---     o consequent
+  |                 |
+  v                 v
+                  t
+```
+
+A fault in the timeline (the 'trend')—cause and effect are reversed:
+
+```
+ causal          temporal
+  |                 |
+  o effect  \ /     o precedent
+  |          X      |
+  o cause   / \     o consequent
+  |                 |
+  v                 v
+                  t
+```
+
