@@ -21,7 +21,8 @@ URL                       = require 'url'
 QUERYSTRING               = require 'querystring'
 FS                        = require 'fs'
 PATH                      = require 'path'
-CS                        = require 'coffee-script'
+COFFEESCRIPT              = require 'coffee-script'
+CP                        = require 'child_process'
 { step, }                 = require 'coffeenode-suspend'
 
 
@@ -55,7 +56,7 @@ stampers =
     fix: ( cause_path, effect_path ) =>
       ### TAINT do we need sync & async fixing? signature? ###
       R = null
-      js_source = CS.compile wrapped_source, { bare: no, filename: cause_path, }
+      js_source = COFFEESCRIPT.compile wrapped_source, { bare: no, filename: cause_path, }
       return R
 
   #---------------------------------------------------------------------------------------------------------
@@ -71,7 +72,7 @@ stampers =
     encoding: 'utf-8'
   CP.exec command, settings, ( error, stdout, stderr ) ->
     return handler error if error?
-    return handler null, stdout, stderr
+    return handler null, { stdout, stderr, }
 
 
 #===========================================================================================================
@@ -140,7 +141,7 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @URL._get_relative_path = ( me, anchor, path ) -> PATH.relative anchor, PATH.resolve anchor, path
-@URL._get_absolute_path = ( me, anchor, path ) -> PATH.resolve anchor, path
+@URL._get_absolute_path = ( me, anchor, path ) -> PATH.resolve  anchor, path
 
 #-----------------------------------------------------------------------------------------------------------
 @URL.join = ( me, protocol, path = null ) =>

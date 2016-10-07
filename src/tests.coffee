@@ -25,7 +25,6 @@ test_data_home            = PATH.resolve __dirname, '../test-data'
 templates_home            = PATH.resolve test_data_home, 'templates'
 # test_filenames            = [ 'f.coffee', 'f.js', 'a.json', ]
 touch                     = require 'touch'
-CP                        = require 'child_process'
 
 
 #===========================================================================================================
@@ -207,8 +206,43 @@ CP                        = require 'child_process'
     T.eq boxed_trend, [["file:///~test-data/f.js"],["file:///~test-data/f.coffee"]]
     T.eq first_fault, {"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}
     T.eq faults,      [{"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}]
-    # warn first_fault
-    # urge faults
+    done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "fix fault(s) (simple case)" ] = ( T, done ) ->
+  step ( resume ) =>
+    @_procure_test_files()
+    @_touch_sync PATH.resolve __dirname, '../test-data/f.js'
+    # @_touch_sync PATH.resolve __dirname, '../test-data/f.coffee'
+    #.......................................................................................................
+    g           = TC.new_cache()
+    home        = PATH.resolve __dirname, '..'
+    TC.URL.set_anchor g, 'file', home
+    #.......................................................................................................
+    urls =
+      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'test-data/f.js'
+    #.......................................................................................................
+    protocol_1  = 'bash'
+    advice_1    = 'coffee -c test-data'
+    TC.register g, urls.f_coffee, urls.f_js, [ protocol_1, advice_1, ]
+    fault_2     = yield TC.find_first_fault  g, resume
+    if fault_2? then { fix: [ protocol_2, advice_2, ], } = fault_2
+    else                    [ protocol_2, advice_2, ] = [ undefined, undefined, ]
+    debug '76765', fault_2, protocol_2, advice_2
+    #.......................................................................................................
+    T.eq protocol_1,  protocol_2
+    T.eq advice_1,    advice_2
+    #.......................................................................................................
+    if protocol_2 is protocol_1
+      debug '33425', yield TC._shell advice_2, resume
+      #.......................................................................................................
+      fault_3 = yield TC.find_first_fault  g, resume
+      T.eq fault_3, null
+    #.......................................................................................................
+    else
+      T.fail "expected #{rpr protocol_1}, got #{rpr protocol_2}"
+    #.......................................................................................................
     done()
 
 
@@ -223,6 +257,7 @@ unless module.parent?
     "file URLs are roundtrip-invariant"
     "only file URLs are relativized / absolutized"
     "find fault(s) (simple case)"
+    "fix fault(s) (simple case)"
     ]
   @_prune()
   @_main()
