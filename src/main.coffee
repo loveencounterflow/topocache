@@ -6,88 +6,39 @@
 ############################################################################################################
 CND                       = require 'cnd'
 rpr                       = CND.rpr
-badge                     = 'TOPOCACHE/TESTS'
+badge                     = 'TOPOCACHE/MAIN'
 log                       = CND.get_logger 'plain',     badge
 debug                     = CND.get_logger 'debug',     badge
-info                      = CND.get_logger 'info',      badge
-warn                      = CND.get_logger 'warn',      badge
-help                      = CND.get_logger 'help',      badge
-urge                      = CND.get_logger 'urge',      badge
-whisper                   = CND.get_logger 'whisper',   badge
-echo                      = CND.echo.bind CND
+# info                      = CND.get_logger 'info',      badge
+# warn                      = CND.get_logger 'warn',      badge
+# help                      = CND.get_logger 'help',      badge
+# urge                      = CND.get_logger 'urge',      badge
+# whisper                   = CND.get_logger 'whisper',   badge
+# echo                      = CND.echo.bind CND
 #...........................................................................................................
 LTSORT                    = require 'ltsort'
-URL                       = require 'url'
-QUERYSTRING               = require 'querystring'
-FS                        = require 'fs'
-PATH                      = require 'path'
-COFFEESCRIPT              = require 'coffee-script'
-CP                        = require 'child_process'
 { step, }                 = require 'coffeenode-suspend'
 
-
-#-----------------------------------------------------------------------------------------------------------
-stampers =
-  #---------------------------------------------------------------------------------------------------------
-  # cache:
-
-  #---------------------------------------------------------------------------------------------------------
-  file:
-    # #.......................................................................................................
-    # get_timestamp: ( path ) =>
-    #   ### TAINT return special value when file doesn't exist ###
-    #   nfo = FS.statSync path
-    #   return +nfo[ 'mtime' ]
-
-    #.......................................................................................................
-    fetch_timestamp: ( path, handler ) =>
-      step ( resume ) =>
-        try
-          stat  = yield FS.stat path, resume
-          Z     = +stat[ 'mtime' ]
-        catch error
-          throw error unless error[ 'code' ] is 'ENOENT'
-          ### TAINT use special value to signal file missing ###
-          Z = null
-        handler null, Z
-
-  #---------------------------------------------------------------------------------------------------------
-  coffee:
-    fix: ( cause_path, effect_path ) =>
-      ### TAINT do we need sync & async fixing? signature? ###
-      R = null
-      js_source = COFFEESCRIPT.compile wrapped_source, { bare: no, filename: cause_path, }
-      return R
-
-  #---------------------------------------------------------------------------------------------------------
-  # bash:
-  #---------------------------------------------------------------------------------------------------------
-  # method:
-
-#-----------------------------------------------------------------------------------------------------------
-@_shell = ( command, handler ) ->
-  # command       = 'ls -AlF'
-  settings =
-    cwd:      PATH.resolve __dirname, '..'
-    encoding: 'utf-8'
-  CP.exec command, settings, ( error, stdout, stderr ) ->
-    return handler error if error?
-    return handler null, { stdout, stderr, }
 
 
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
 #-----------------------------------------------------------------------------------------------------------
-@new_cache = ->
+@new_cache = ( stamper ) ->
+  throw new Error "expected a function, got a #{type}" unless ( type = CND.type_of stamper ) is 'function'
+  throw new Error "expected a function with arity 2, got one with arity #{arity}" unless stamper.length is 2
+  #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
-    'graph':      LTSORT.new_graph loners: no
+    'graph':      LTSORT.new_graph loners: yes
     'fixes':      {}
     'store':      {}
-    'stampers':   Object.assign {}, stampers
+    'stamper':    stamper
     'anchors':    {}
+  #.........................................................................................................
   @_reset_chart R
   @_reset_trend R
+  #.........................................................................................................
   return R
 
 #-----------------------------------------------------------------------------------------------------------
@@ -110,19 +61,20 @@ stampers =
 #
 #-----------------------------------------------------------------------------------------------------------
 @register = ( me, cause, effect, fix ) ->
-  cause_url     = if ( CND.isa_list  cause ) then ( @URL.join me,  cause... ) else  cause
-  effect_url    = if ( CND.isa_list effect ) then ( @URL.join me, effect... ) else effect
-  rc_key                  = @_get_rc_key me, cause_url, effect_url
+  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
+  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
+  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of fix    ) is 'text'
+  rc_key                  = @_get_rc_key me, cause, effect
   me[ 'fixes' ][ rc_key ] = fix
-  LTSORT.add me[ 'graph' ], cause_url, effect_url
+  LTSORT.add me[ 'graph' ], cause, effect
   @_reset_chart me
   return null
 
 #-----------------------------------------------------------------------------------------------------------
 @get_fix = ( me, cause, effect, fallback ) ->
-  cause_url     = if ( CND.isa_list  cause ) then ( @URL.join me,  cause... ) else  cause
-  effect_url    = if ( CND.isa_list effect ) then ( @URL.join me, effect... ) else effect
-  rc_key                  = @_get_rc_key me, cause_url, effect_url
+  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
+  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
+  rc_key                  = @_get_rc_key me, cause, effect
   unless ( R = me[ 'fixes' ][ rc_key ] )?
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
     R = fallback
@@ -130,73 +82,15 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @_get_rc_key = ( me, cause, effect ) ->
-  ### TAINT use URLs for RC key as well ###
+  ### TAINT use URLs for RC keys? ###
   return "#{effect} -> #{cause}"
 
 
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-@URL = {}
-
-#-----------------------------------------------------------------------------------------------------------
-@URL._get_relative_path = ( me, anchor, path ) -> PATH.relative anchor, PATH.resolve anchor, path
-@URL._get_absolute_path = ( me, anchor, path ) -> PATH.resolve  anchor, path
-
-#-----------------------------------------------------------------------------------------------------------
-@URL.join = ( me, protocol, path = null ) =>
-  unless path?
-    path      = protocol
-    protocol  = 'file'
-  if ( anchor = me[ 'anchors' ][ protocol ] )?
-    ### TAINT consider to use other methods for other protocols ###
-    ### TAINT consider to only use after testing for being a relative path ###
-    path = PATH.relative anchor, PATH.resolve anchor, path
-  path = '~' + path
-  return URL.format { protocol, slashes: yes, pathname: path, }
-
-#-----------------------------------------------------------------------------------------------------------
-@URL.split = ( me, url ) =>
-  R         = URL.parse url, no, no
-  protocol  = R[ 'protocol' ].replace /:$/g, ''
-  path      = QUERYSTRING.unescape R[ 'pathname' ]
-  path      = path.replace /^\/~/g, ''
-  # path   = path.replace /^\//g, ''
-  #.........................................................................................................
-  switch protocol
-    when 'file' then path = PATH.resolve ( me[ 'anchors' ][ protocol ] ? '.' ), path
-  #.........................................................................................................
-  return [ protocol, path, ]
-
-#-----------------------------------------------------------------------------------------------------------
-@URL.set_anchor = ( me, protocol, anchor ) =>
-  ### Anchors are reference points so you can use relative paths to files and web addresses. ###
-  throw new Error "need anchor, got #{rpr anchor}" unless anchor?
-  throw new Error "unable to reset anchor for protocol #{rpr protocol}" if me[ 'anchors' ][ protocol ]?
-  throw new Error "unable to set anchor after adding dependency" unless @_is_fresh me
-  switch protocol
-    when 'file'
-      me[ 'anchors' ][ protocol ] = anchor
-    else
-      throw new Error "unable to set anchor for protocol #{rpr protocol}"
-  return null
-
-
-#===========================================================================================================
-#
-#-----------------------------------------------------------------------------------------------------------
-@timestamp_from_url = ( me, url, handler ) ->
-  ### TAINT use URLs as keys into info objects to avoid repeated parsing ###
-  [ protocol, path, ] = @URL.split me, url
-  stamper             = me[ 'stampers' ][ protocol ]
-  return handler new Error "no stamper for protocol #{rpr protocol}" unless stamper?
-  stamper.fetch_timestamp path, handler
-
-
-#===========================================================================================================
-#
-#-----------------------------------------------------------------------------------------------------------
 @get_boxed_chart = ( me ) ->
+  throw new Error "### TAINT must deal with loner events ###"
   return R if ( R = me[ 'boxed-chart' ] )?
   LTSORT.linearize me[ 'graph' ]
   return me[ 'boxed-chart' ] = LTSORT.group me[ 'graph' ]
@@ -208,6 +102,7 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
+  throw new Error "### TAINT must deal with loner events ###"
   if ( Z = me[ 'boxed-trend' ] )?
     setImmediate -> handler null, Z
     return null
@@ -215,9 +110,9 @@ stampers =
   step ( resume ) =>
     Z         = []
     collector = {}
-    for url of @get_indexed_chart me
-      t = yield @timestamp_from_url me, url, resume
-      ( collector[ t ] ?= [] ).push url
+    for id of @get_indexed_chart me
+      t = yield me[ 'stamper' ] id, resume
+      ( collector[ t ] ?= [] ).push id
     Z.push collector[ t ] for t in ( Object.keys collector ).sort()
     handler null, me[ 'boxed-trend' ] = Z
   #.........................................................................................................
@@ -252,6 +147,7 @@ stampers =
 
 #-----------------------------------------------------------------------------------------------------------
 @_find_faults = ( me, first_only, handler ) ->
+  throw new Error "### TAINT must deal with loner events ###"
   step ( resume ) =>
     @_reset_trend me
     indexed_chart = @get_indexed_chart me

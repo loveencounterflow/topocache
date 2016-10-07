@@ -24,7 +24,6 @@ FS                        = require 'fs'
 test_data_home            = PATH.resolve __dirname, '../test-data'
 templates_home            = PATH.resolve test_data_home, 'templates'
 # test_filenames            = [ 'f.coffee', 'f.js', 'a.json', ]
-touch                     = require 'touch'
 
 
 #===========================================================================================================
@@ -48,7 +47,9 @@ touch                     = require 'touch'
       to   #{target_path}"""
 
 #-----------------------------------------------------------------------------------------------------------
-@_touch_sync = ( path ) -> touch.sync path, { mtime: true, }
+@_touch = ( path, handler ) ->
+  ### TAINT must properly escape path unless you know what you're doing ###
+  TC._shell "touch #{path}", handler
 
 #-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
@@ -94,8 +95,8 @@ touch                     = require 'touch'
     TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
     urls =
-      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'test-data/f.js'
+      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
     #.......................................................................................................
     TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
     boxed_chart = TC.get_boxed_chart g
@@ -159,7 +160,7 @@ touch                     = require 'touch'
     g               = TC.new_cache()
     TC.URL.set_anchor g, 'file', anchor if anchor?
     is_relative     = not path_1.startsWith '/'
-    url             = TC.URL.join g, path_1
+    url             = TC.URL.join g, 'file', path_1
     [ _, path_2, ]  = TC.URL.split g, url
     matcher         = PATH.resolve ( anchor ? implicit_anchor ), path_1
     #.......................................................................................................
@@ -173,7 +174,7 @@ touch                     = require 'touch'
 @[ "only file URLs are relativized / absolutized" ] = ( T, done ) ->
   g               = TC.new_cache()
   TC.URL.set_anchor g, 'file', anchor if anchor?
-  T.eq ( TC.URL.join  g,                 [ 'bash', 'coffee -c test-data', ]... ), 'bash:///~coffee -c test-data'
+  T.eq ( TC.URL.join  g,                 [ 'bash', 'coffee -c test-data', ]... ), 'bash:///coffee -c test-data'
   T.eq ( TC.URL.split g, TC.URL.join g,  [ 'bash', 'coffee -c test-data', ]... ), [ 'bash', 'coffee -c test-data', ]
   #.........................................................................................................
   done()
@@ -182,16 +183,15 @@ touch                     = require 'touch'
 @[ "find fault(s) (simple case)" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    @_touch_sync PATH.resolve __dirname, '../test-data/f.js'
-    # @_touch_sync PATH.resolve __dirname, '../test-data/f.coffee'
+    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
     #.......................................................................................................
     g           = TC.new_cache()
     home        = PATH.resolve __dirname, '..'
     TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
     urls =
-      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'test-data/f.js'
+      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
     #.......................................................................................................
     TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
     boxed_chart =         TC.get_boxed_chart g
@@ -202,26 +202,25 @@ touch                     = require 'touch'
     urge JSON.stringify boxed_trend
     urge JSON.stringify first_fault
     urge JSON.stringify faults
-    T.eq boxed_chart, [["file:///~test-data/f.coffee"],["file:///~test-data/f.js"]]
-    T.eq boxed_trend, [["file:///~test-data/f.js"],["file:///~test-data/f.coffee"]]
-    T.eq first_fault, {"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}
-    T.eq faults,      [{"reference":"file:///~test-data/f.js","comparison":"file:///~test-data/f.coffee","fix":["bash","coffee -c test-data"]}]
+    T.eq boxed_chart, [["file:///test-data/f.coffee"],["file:///test-data/f.js"]]
+    T.eq boxed_trend, [["file:///test-data/f.js"],["file:///test-data/f.coffee"]]
+    T.eq first_fault, {"reference":"file:///test-data/f.js","comparison":"file:///test-data/f.coffee","fix":["bash","coffee -c test-data"]}
+    T.eq faults,      [{"reference":"file:///test-data/f.js","comparison":"file:///test-data/f.coffee","fix":["bash","coffee -c test-data"]}]
     done()
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix fault(s) (simple case)" ] = ( T, done ) ->
+@[ "fix fault(s) (simple case) (1)" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    @_touch_sync PATH.resolve __dirname, '../test-data/f.js'
-    # @_touch_sync PATH.resolve __dirname, '../test-data/f.coffee'
+    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
     #.......................................................................................................
     g           = TC.new_cache()
     home        = PATH.resolve __dirname, '..'
     TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
     urls =
-      f_coffee:           TC.URL.join g, 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'test-data/f.js'
+      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
+      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
     #.......................................................................................................
     protocol_1  = 'bash'
     advice_1    = 'coffee -c test-data'
@@ -236,12 +235,81 @@ touch                     = require 'touch'
     #.......................................................................................................
     if protocol_2 is protocol_1
       debug '33425', yield TC._shell advice_2, resume
-      #.......................................................................................................
       fault_3 = yield TC.find_first_fault  g, resume
       T.eq fault_3, null
     #.......................................................................................................
     else
       T.fail "expected #{rpr protocol_1}, got #{rpr protocol_2}"
+    #.......................................................................................................
+    done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "URL.is_url" ] = ( T, done ) ->
+  probes_and_matchers = [
+    [ null,                                            no,  ]
+    [ '',                                              no,  ]
+    [ [ 'file', 'foo/bar', ],                          no,  ]
+    [ 'foo/bar',                                       no,  ]
+    [ 'file://foo/bar',                                yes, ]
+    [ 'file:///foo/bar',                               yes, ]
+    [ 'file:///~foo/bar',                              yes, ]
+    [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', yes, ]
+    ]
+  #.........................................................................................................
+  for [ probe, matcher, ] in probes_and_matchers
+    urge ( CND.white rpr probe ), ( CND.truth TC.URL.is_url null, probe )
+    T.eq ( TC.URL.is_url null, probe ), matcher
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "URL.from" ] = ( T, done ) ->
+  g                   = TC.new_cache()
+  probes_and_matchers = [
+    # [ [ null,                                            ], null,  ]
+    [ [ '',                                              ], null,  ]
+    [ [ [ 'file', 'foo/bar', ],                          ], null,  ]
+    [ [ [ 'http', 'domain.com/foo/bar', ],                          ], null,  ]
+    [ [ 'foo/bar',                                       ], null,  ]
+    [ [ 'file://foo/bar',                                ], null, ]
+    [ [ 'file:///foo/bar',                               ], null, ]
+    [ [ 'file:///~foo/bar',                              ], null, ]
+    [ [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', ], null, ]
+    ]
+  #.........................................................................................................
+  for [ probe, matcher, ] in probes_and_matchers
+    urge ( CND.white rpr probe ), ( CND.gold rpr TC.URL.from g, probe... )
+    # T.eq ( TC.URL.is_url null, probe ), matcher
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "fix fault(s) (simple case) (2)" ] = ( T, done ) ->
+  step ( resume ) =>
+    @_procure_test_files()
+    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
+    #.......................................................................................................
+    g           = TC.new_cache()
+    TC.URL.set_anchor g, 'file', ( PATH.resolve __dirname, '..' )
+    #.......................................................................................................
+    protocol_1  = 'bash'
+    advice_1    = 'coffee -c test-data'
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', [ protocol_1, advice_1, ]
+    fault_2     = yield TC.find_first_fault g, resume
+    # if fault_2? then { fix: [ protocol_2, advice_2, ], } = fault_2
+    # else                    [ protocol_2, advice_2, ] = [ undefined, undefined, ]
+    # debug '76765', fault_2, protocol_2, advice_2
+    # #.......................................................................................................
+    # T.eq protocol_1,  protocol_2
+    # T.eq advice_1,    advice_2
+    # #.......................................................................................................
+    # if protocol_2 is protocol_1
+    #   debug '33425', yield TC._shell advice_2, resume
+    #   fault_3 = yield TC.find_first_fault  g, resume
+    #   T.eq fault_3, null
+    # #.......................................................................................................
+    # else
+    #   T.fail "expected #{rpr protocol_1}, got #{rpr protocol_2}"
     #.......................................................................................................
     done()
 
@@ -257,7 +325,10 @@ unless module.parent?
     "file URLs are roundtrip-invariant"
     "only file URLs are relativized / absolutized"
     "find fault(s) (simple case)"
-    "fix fault(s) (simple case)"
+    "fix fault(s) (simple case) (1)"
+    "URL.is_url"
+    "URL.from"
+    # "fix fault(s) (simple case) (2)"
     ]
   @_prune()
   @_main()
@@ -265,7 +336,7 @@ unless module.parent?
   # debug '5562', JSON.stringify key for key in Object.keys @
 
   # CND.run =>
-  # @[ "demo" ] null, -> warn "not tested"
+  #   @[ "fix fault(s) (simple case) (2)" ] null, -> warn "not tested"
 
 
   # debug PATH.resolve '/here', '/there'
@@ -279,4 +350,11 @@ unless module.parent?
   # debug PATH.resolve()
   # g = TC.new_cache()
   # help TC.URL.join g, [ 'file', ( ( require 'querystring' ).escape 'foo/bar/baz.js' ), ]...
+
+  # T = @
+  # step ( resume ) ->
+  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/a.json',   resume
+  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/f.coffee', resume
+  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/f.js',     resume
+
 
