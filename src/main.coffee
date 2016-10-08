@@ -63,7 +63,16 @@ PATH                      = require 'path'
 @register = ( me, cause, effect, fix = null ) ->
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
-  # throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of fix    ) is 'text'
+  ###
+  cause_txt               = JSON.stringify cause
+  effect_txt              = JSON.stringify effect
+  rc_key                  = @_get_cause_effect_key me, cause_txt, effect_txt
+  relation                = { cause, effect, fix, }
+  me[ 'fixes' ][ rc_key ] = relation
+  LTSORT.add me[ 'graph' ], cause_txt, effect_txt
+  @_reset_chart me
+  return null
+  ###
   rc_key                  = @_get_cause_effect_key me, cause, effect
   relation                = { cause, effect, fix, }
   me[ 'fixes' ][ rc_key ] = relation
