@@ -55,7 +55,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return source.length
 
 #-----------------------------------------------------------------------------------------------------------
-@_delay = ( handler ) -> setTimeout handler, 100
+@_delay = ( handler ) -> setTimeout handler, 10
 
 #-----------------------------------------------------------------------------------------------------------
 @_get_source = ( path ) -> FS.readFileSync path, encoding: 'utf-8'
@@ -98,6 +98,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     warn yield TC.find_first_fault  g, resume
     urge yield TC.find_faults       g, resume
     done()
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "find fault(s) (1)" ] = ( T, done ) ->
@@ -122,6 +124,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
     T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
     done()
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "find fault(s) (non-existent file)" ] = ( T, done ) ->
@@ -151,6 +155,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     # T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
     # T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
     done()
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "fix fault(s) (simple case) (1)" ] = ( T, done ) ->
@@ -181,6 +187,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
       T.fail "expected #{rpr fix_1}, got #{rpr fix_2}"
     #.......................................................................................................
     done()
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "find multiple faults" ] = ( T, done ) ->
@@ -229,17 +237,63 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
     urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
     T.eq boxed_trend, [ [ 'g.js' ], [ 'f.js' ], [ 'g.coffee' ], [ 'f.coffee' ], ]
-    # faults = yield TC.find_faults g, resume
-    # # debug '32210', JSON.stringify faults
-    # T.eq faults, [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c f.coffee"},{"reference":"g.js","comparison":"g.coffee","fix":"bash:coffee -c g.coffee"}]
-    # help JSON.stringify fault for fault in faults
-    # #.......................................................................................................
-    # fault_2     = yield TC.find_first_fault g, resume
-    # if fault_2? then fix_2 = fault_2[ 'fix' ]
-    # else             fix_2 = undefined
-    # debug '88810', fault_2, fix_2
-    # #.......................................................................................................
+    help JSON.stringify fault for fault in faults
+    #.......................................................................................................
     done()
+  #.........................................................................................................
+  return null
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "fix multiple faults" ] = ( T, done ) ->
+  step ( resume ) =>
+    g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
+    @_procure_test_files()
+    #.......................................................................................................
+    fix_1       = 'coffee -c f.coffee'
+    fix_2       = 'coffee -c g.coffee'
+    TC.register g, 'f.coffee',  'f.js', fix_1
+    TC.register g, 'g.coffee',  'g.js', fix_2
+    TC.register g, 'g.js',      'f.js', fix_1
+    #.......................................................................................................
+    yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
+    urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
+    faults = yield TC.find_faults g, resume
+    debug '22122', JSON.stringify faults
+    T.eq faults, [{"reference":"f.js","comparison":"g.js","fix":"coffee -c f.coffee"}]
+    help JSON.stringify fault for fault in faults
+    #.......................................................................................................
+    yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
+    urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
+    faults = yield TC.find_faults g, resume
+    debug '22122', JSON.stringify faults
+    T.eq faults, [{"reference":"g.js","comparison":"g.coffee","fix":"coffee -c g.coffee"},{"reference":"f.js","comparison":"f.coffee","fix":"coffee -c f.coffee"},{"reference":"f.js","comparison":"g.js","fix":"coffee -c f.coffee"}]
+    first_fault = yield TC.find_first_fault g, resume
+    T.eq first_fault, faults[ 0 ]
+    help JSON.stringify fault for fault in faults
+    #.......................................................................................................
+    count = 0
+    while ( fault = yield TC.find_first_fault g, resume )?
+      urge fault
+      count += +1
+      if count > 10
+        T.fail "runaway loop?"
+        break
+      { fix, }            = fault
+      { stdout, stderr, } = yield TC.HELPERS.shell g, fix, resume
+      T.eq stdout, ''
+      T.eq stderr, ''
+    #.......................................................................................................
+    done()
+  #.........................................................................................................
+  return null
 
     # #.......................................................................................................
     # T.eq fix_1, fix_2
@@ -266,6 +320,7 @@ unless module.parent?
     "find fault(s) (non-existent file)"
     "fix fault(s) (simple case) (1)"
     "find multiple faults"
+    "fix multiple faults"
     ]
   @_prune()
   @_main()
@@ -274,60 +329,4 @@ unless module.parent?
 
   # CND.run =>
   #   @[ "fix fault(s) (simple case) (2)" ] null, -> warn "not tested"
-
-
-  # debug PATH.resolve '/here', '/there'
-  # debug PATH.resolve '/here', 'there'
-  # debug PATH.resolve '', '/there'
-  # debug PATH.resolve '', 'there'
-  # debug PATH.resolve ''
-  # debug PATH.resolve '.'
-  # debug PATH.resolve '..'
-  # debug PATH.resolve 'foo/../bar'
-  # debug PATH.resolve()
-  # g = TC.new_cache()
-  # help TC.URL.join g, [ 'file', ( ( require 'querystring' ).escape 'foo/bar/baz.js' ), ]...
-
-  # ls = ( me, path, handler ) =>
-  #   step ( resume ) =>
-  #     locator = PATH.resolve me[ 'home' ], path
-  #     try
-  #       stat  = yield ( require 'fs' ).stat locator, resume
-  #       # Z     = Math.max +stat[ 'mtime' ], +stat[ 'atime' ], +stat[ 'ctime' ]
-  #       Z     = +stat[ 'mtime' ]
-  #     catch error
-  #       throw error unless error[ 'code' ] is 'ENOENT'
-  #       ### TAINT use special value to signal file missing ###
-  #       Z = null
-  #     handler null, Z
-
-  # X = @
-  # step ( resume ) ->
-  #   g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
-  #   TC.register g, 'f.coffee', 'f.js', 'coffee -c f.coffee'
-  #   TC.register g, 'g.coffee', 'g.js', 'coffee -c g.coffee'
-  #   yield TC.HELPERS.touch g, 'f.coffee', resume; yield X._delay resume
-  #   yield TC.HELPERS.touch g, 'g.coffee', resume; yield X._delay resume
-  #   yield TC.HELPERS.touch g, 'g.js',     resume; yield X._delay resume
-  #   yield TC.HELPERS.touch g, 'f.js',     resume; yield X._delay resume
-  #   paths = [ 'f.coffee', 'f.js', 'g.coffee', 'g.js', ]
-  #   paths_and_times = []
-  #   #.......................................................................................................
-  #   for path in paths
-  #     time = yield ls g, path, resume
-  #     paths_and_times.push [ path, time, ]
-  #   #.......................................................................................................
-  #   paths_and_times.sort ( a, b ) ->
-  #     t_a = +a[ 1 ]
-  #     t_b = +b[ 1 ]
-  #     return +1 if t_a > t_b
-  #     return -1 if t_a < t_b
-  #     return  0
-  #   #.......................................................................................................
-  #   for [ path, time, ] in paths_and_times
-  #     path_txt  = path
-  #     path_txt += ' ' while path_txt.length < 20
-  #     help path_txt, time
-  #   #.......................................................................................................
-  #   debug yield TC.fetch_boxed_trend g, resume
 
