@@ -10,7 +10,7 @@ badge                     = 'TOPOCACHE/MAIN'
 log                       = CND.get_logger 'plain',     badge
 debug                     = CND.get_logger 'debug',     badge
 # info                      = CND.get_logger 'info',      badge
-# warn                      = CND.get_logger 'warn',      badge
+warn                      = CND.get_logger 'warn',      badge
 # help                      = CND.get_logger 'help',      badge
 # urge                      = CND.get_logger 'urge',      badge
 # whisper                   = CND.get_logger 'whisper',   badge
@@ -61,39 +61,29 @@ PATH                      = require 'path'
 #
 #-----------------------------------------------------------------------------------------------------------
 @register = ( me, cause, effect, fix = null ) ->
-  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
-  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
-  ###
-  cause_txt               = JSON.stringify cause
-  effect_txt              = JSON.stringify effect
-  rc_key                  = @_get_cause_effect_key me, cause_txt, effect_txt
+  cause_json              = JSON.stringify cause
+  effect_json             = JSON.stringify effect
+  rc_key                  = @_get_cause_effect_key me, cause_json, effect_json
   relation                = { cause, effect, fix, }
   me[ 'fixes' ][ rc_key ] = relation
-  LTSORT.add me[ 'graph' ], cause_txt, effect_txt
-  @_reset_chart me
-  return null
-  ###
-  rc_key                  = @_get_cause_effect_key me, cause, effect
-  relation                = { cause, effect, fix, }
-  me[ 'fixes' ][ rc_key ] = relation
-  LTSORT.add me[ 'graph' ], cause, effect
+  LTSORT.add me[ 'graph' ], cause_json, effect_json
   @_reset_chart me
   return null
 
 #-----------------------------------------------------------------------------------------------------------
 @get_fix = ( me, cause, effect, fallback ) ->
-  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
-  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
-  rc_key                  = @_get_cause_effect_key me, cause, effect
+  cause_json  = JSON.stringify cause
+  effect_json = JSON.stringify effect
+  rc_key      = @_get_cause_effect_key me, cause_json, effect_json
   unless ( R = me[ 'fixes' ][ rc_key ] )?
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
     R = fallback
   return R
 
 #-----------------------------------------------------------------------------------------------------------
-@_get_cause_effect_key = ( me, cause, effect ) ->
-  ### TAINT use URLs for RC keys? ###
-  return "#{effect} -> #{cause}"
+@_get_cause_effect_key = ( me, cause_json, effect_json ) ->
+  ### TAINT wrong way around ###
+  return "#{effect_json} -> #{cause_json}"
 
 
 #===========================================================================================================
@@ -101,8 +91,12 @@ PATH                      = require 'path'
 #-----------------------------------------------------------------------------------------------------------
 @get_boxed_chart = ( me ) ->
   return R if ( R = me[ 'boxed-chart' ] )?
-  LTSORT.linearize me[ 'graph' ]
-  return me[ 'boxed-chart' ] = LTSORT.group me[ 'graph' ]
+  # LTSORT.linearize me[ 'graph' ]
+  R = []
+  for box in LTSORT.group me[ 'graph' ]
+    target = []
+    R.push ( JSON.parse id_json for id_json in box )
+  return me[ 'boxed-chart' ] = R
 
 #-----------------------------------------------------------------------------------------------------------
 @get_indexed_chart = ( me ) ->
@@ -182,7 +176,9 @@ PATH                      = require 'path'
         warn_missing ref_name
         continue
       #.....................................................................................................
-      for cmp_name in me[ 'graph' ][ 'precedents' ].get ref_name
+      ref_name_json = JSON.stringify ref_name
+      for cmp_name_json in me[ 'graph' ][ 'precedents' ].get ref_name_json
+        cmp_name = JSON.parse cmp_name_json
         cmp_trending_idx = indexed_trend[ cmp_name ]
         #...................................................................................................
         unless cmp_trending_idx?
