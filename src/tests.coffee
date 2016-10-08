@@ -352,5 +352,5 @@ unless module.parent?
   # debug '5562', JSON.stringify key for key in Object.keys @
 
   # CND.run =>
-  #   @[ "fix fault(s) (simple case) (2)" ] null, -> warn "not tested"
+  #   @[ "register file objects" ] null, -> warn "not tested"
 
