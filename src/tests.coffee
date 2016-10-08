@@ -47,11 +47,6 @@ templates_home            = PATH.resolve test_data_home, 'templates'
       to   #{target_path}"""
 
 #-----------------------------------------------------------------------------------------------------------
-@_touch = ( path, handler ) ->
-  ### TAINT must properly escape path unless you know what you're doing ###
-  TC.HELPERS.shell "touch #{path}", handler
-
-#-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
   FS.writeFileSync target_path, source = FS.readFileSync source_path
   return source.length
@@ -101,10 +96,10 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "find fault(s) (simple case)" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
     #.......................................................................................................
-    g           = TC.new_cache()
-    home        = PATH.resolve __dirname, '..'
+    home        = PATH.resolve __dirname, '../test-data'
+    g           = TC.new_cache { home, }
+    yield TC.HELPERS.touch g, 'f.coffee', resume
     #.......................................................................................................
     TC.register g, 'test-data/f.coffee', 'test-data/f.js', 'bash:coffee -c test-data'
     boxed_chart =         TC.get_boxed_chart g
@@ -125,14 +120,13 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "fix fault(s) (simple case) (1)" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
     #.......................................................................................................
-    g           = TC.new_cache()
-    home        = PATH.resolve __dirname, '..'
+    home        = PATH.resolve __dirname, '../test-data'
+    g           = TC.new_cache { home, }
+    yield TC.HELPERS.touch g, 'f.coffee', resume
     #.......................................................................................................
-    # fix_1    = -> TC.HELPERS.shell 'coffee -c test-data'
-    fix_1       = 'bash:coffee -c test-data'
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', fix_1
+    fix_1       = 'bash:coffee -c .'
+    TC.register g, 'f.coffee', 'f.js', fix_1
     fault_2     = yield TC.find_first_fault  g, resume
     if fault_2? then fix_2 = fault_2[ 'fix' ]
     else             fix_2 = undefined
@@ -142,7 +136,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     if fix_2 is fix_1
       fix = fix_2.replace /^bash:\s*/, ''
-      { stderr, stdout, } = yield TC.HELPERS.shell fix, resume
+      { stderr, stdout, } = yield TC.HELPERS.shell g, fix, resume
       T.eq stderr, ''
       T.eq stdout, ''
       fault_3 = yield TC.find_first_fault g, resume
@@ -154,32 +148,43 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     done()
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix fault(s) (simple case) (2)" ] = ( T, done ) ->
+@[ "fix multiple faults" ] = ( T, done ) ->
   step ( resume ) =>
+    g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
     @_procure_test_files()
-    yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
+    yield TC.HELPERS.touch g, 'f.coffee', resume
+    yield TC.HELPERS.touch g, 'g.coffee', resume
+    yield TC.HELPERS.touch g, 'f.js',     resume
+    yield TC.HELPERS.touch g, 'g.js',     resume
     #.......................................................................................................
-    g           = TC.new_cache()
-    #.......................................................................................................
-    protocol_1  = 'bash'
-    fix_1    = 'coffee -c test-data'
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', [ protocol_1, fix_1, ]
+    fix_1       = 'bash:coffee -c f.coffee'
+    fix_2       = 'bash:coffee -c g.coffee'
+    debug '12000', yield TC.find_faults g, resume
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', fix_1
+    debug '12000', yield TC.find_faults g, resume
+    TC.register g, 'test-data/g.coffee', 'test-data/g.js', fix_1
+    debug '12000', yield TC.find_faults g, resume
+    debug '30331', g
+    for fault in yield TC.find_faults g, resume
+      help JSON.stringify fault
     fault_2     = yield TC.find_first_fault g, resume
-    # if fault_2? then { fix: [ protocol_2, fix_2, ], } = fault_2
-    # else                    [ protocol_2, fix_2, ] = [ undefined, undefined, ]
-    # debug '76765', fault_2, protocol_2, fix_2
+    if fault_2? then fix_2 = fault_2[ 'fix' ]
+    else             fix_2 = undefined
+    debug '88810', fault_2, fix_2
     # #.......................................................................................................
-    # T.eq protocol_1,  protocol_2
-    # T.eq fix_1,    fix_2
+    # T.eq fix_1, fix_2
     # #.......................................................................................................
-    # if protocol_2 is protocol_1
-    #   debug '33425', yield TC.HELPERS.shell fix_2, resume
-    #   fault_3 = yield TC.find_first_fault  g, resume
+    # if fix_2 is fix_1
+    #   fix = fix_2.replace /^bash:\s*/, ''
+    #   { stderr, stdout, } = yield TC.HELPERS.shell g, fix, resume
+    #   T.eq stderr, ''
+    #   T.eq stdout, ''
+    #   fault_3 = yield TC.find_first_fault g, resume
     #   T.eq fault_3, null
     # #.......................................................................................................
     # else
-    #   T.fail "expected #{rpr protocol_1}, got #{rpr protocol_2}"
-    #.......................................................................................................
+    #   T.fail "expected #{rpr fix_1}, got #{rpr fix_2}"
+    # #.......................................................................................................
     done()
 
 
@@ -191,7 +196,7 @@ unless module.parent?
     "register file objects"
     "find fault(s) (simple case)"
     "fix fault(s) (simple case) (1)"
-    # # "fix fault(s) (simple case) (2)"
+    "fix multiple faults"
     ]
   @_prune()
   @_main()
@@ -214,10 +219,5 @@ unless module.parent?
   # g = TC.new_cache()
   # help TC.URL.join g, [ 'file', ( ( require 'querystring' ).escape 'foo/bar/baz.js' ), ]...
 
-  # T = @
-  # step ( resume ) ->
-  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/a.json',   resume
-  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/f.coffee', resume
-  #   yield T._touch '/home/flow/io/mingkwai-rack/topocache/test-data/f.js',     resume
 
 

@@ -18,19 +18,21 @@ debug                     = CND.get_logger 'debug',     badge
 #...........................................................................................................
 LTSORT                    = require 'ltsort'
 { step, }                 = require 'coffeenode-suspend'
+PATH                      = require 'path'
 
 
 
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
 #-----------------------------------------------------------------------------------------------------------
-@new_cache = ( stamper = null ) ->
-  stamper ?= @HELPERS.file_stamper
+@new_cache = ( settings = null ) ->
+  stamper = settings?[ 'stamper'  ] ? @HELPERS.file_stamper
+  home    = settings?[ 'home'     ] ? process.cwd()
   #.........................................................................................................
   unless ( type = CND.type_of stamper ) is 'function'
     throw new Error "expected a function, got a #{type}"
-  unless ( arity = stamper.length ) is 2
-    throw new Error "expected a function with arity 2, got one with arity #{arity}"
+  unless ( arity = stamper.length ) is 3
+    throw new Error "expected a function with arity 3, got one with arity #{arity}"
   #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
@@ -38,6 +40,7 @@ LTSORT                    = require 'ltsort'
     'fixes':      {}
     'store':      {}
     'stamper':    stamper
+    'home':       home
     'anchors':    {}
   #.........................................................................................................
   @_reset_chart R
@@ -67,10 +70,11 @@ LTSORT                    = require 'ltsort'
 @HELPERS = {}
 
 #-----------------------------------------------------------------------------------------------------------
-@HELPERS.file_stamper = ( path, handler ) =>
+@HELPERS.file_stamper = ( me, path, handler ) =>
   step ( resume ) =>
+    locator = PATH.resolve me[ 'home' ], path
     try
-      stat  = yield ( require 'fs' ).stat path, resume
+      stat  = yield ( require 'fs' ).stat locator, resume
       Z     = +stat[ 'mtime' ]
     catch error
       throw error unless error[ 'code' ] is 'ENOENT'
@@ -79,13 +83,19 @@ LTSORT                    = require 'ltsort'
     handler null, Z
 
 #-----------------------------------------------------------------------------------------------------------
-@HELPERS.shell = ( command, handler ) ->
+@HELPERS.shell = ( me, command, handler ) =>
   ### TAINT consider to use `spawn` so we get safe arguments ###
   # cwd:      PATH.resolve __dirname, '..'
-  settings = { encoding: 'utf-8', }
-  ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) ->
+  settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
+  ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
     return handler error if error?
     return handler null, { stdout, stderr, }
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.touch = ( me, path, handler ) =>
+  ### TAINT must properly escape path unless you know what you're doing ###
+  locator = PATH.resolve me[ 'home' ], path
+  @HELPERS.shell me, "touch #{locator}", handler
 
 
 #===========================================================================================================
@@ -140,7 +150,7 @@ LTSORT                    = require 'ltsort'
     Z         = []
     collector = {}
     for id of @get_indexed_chart me
-      t = yield me[ 'stamper' ] id, resume
+      t = yield me[ 'stamper' ] me, id, resume
       ( collector[ t ] ?= [] ).push id
     Z.push collector[ t ] for t in ( Object.keys collector ).sort()
     handler null, me[ 'boxed-trend' ] = Z
