@@ -121,8 +121,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     urge JSON.stringify faults
     T.eq boxed_chart, [["f.coffee"],["f.js"]]
     T.eq boxed_trend, [["f.js"],["f.coffee"]]
-    T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
-    T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
+    T.eq first_fault, {"cause":"f.coffee","effect":"f.js","fix":"bash:coffee -c test-data"}
+    T.eq faults,      [{"cause":"f.coffee","effect":"f.js","fix":"bash:coffee -c test-data"}]
     done()
   #.........................................................................................................
   return null
@@ -152,14 +152,14 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     # urge JSON.stringify faults
     # T.eq boxed_chart, [["f.coffee"],["f.js"]]
     # T.eq boxed_trend, [["f.js"],["f.coffee"]]
-    # T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
-    # T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
+    # T.eq first_fault, {"effect":"f.js","cause":"f.coffee","fix":"bash:coffee -c test-data"}
+    # T.eq faults,      [{"effect":"f.js","cause":"f.coffee","fix":"bash:coffee -c test-data"}]
     done()
   #.........................................................................................................
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix fault(s) (simple case) (1)" ] = ( T, done ) ->
+@[ "find single fault" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
     #.......................................................................................................
@@ -217,7 +217,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     T.eq boxed_trend, [ [ 'g.coffee' ], [ 'g.js' ], [ 'f.js' ], [ 'f.coffee' ], ]
     faults = yield TC.find_faults g, resume
     # debug '32210', JSON.stringify faults
-    T.eq faults, [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c f.coffee"}]
+    T.eq faults, [{"effect":"f.js","cause":"f.coffee","fix":"bash:coffee -c f.coffee"}]
     help JSON.stringify fault for fault in faults
     #.......................................................................................................
     yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
@@ -228,7 +228,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     T.eq boxed_trend, [ [ 'g.js' ], [ 'f.js' ], [ 'f.coffee' ], [ 'g.coffee' ], ]
     faults = yield TC.find_faults g, resume
     # debug '32210', JSON.stringify faults
-    T.eq faults, [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c f.coffee"},{"reference":"g.js","comparison":"g.coffee","fix":"bash:coffee -c g.coffee"}]
+    T.eq faults, [{"effect":"f.js","cause":"f.coffee","fix":"bash:coffee -c f.coffee"},{"effect":"g.js","cause":"g.coffee","fix":"bash:coffee -c g.coffee"}]
     help JSON.stringify fault for fault in faults
     #.......................................................................................................
     yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
@@ -263,7 +263,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
     faults = yield TC.find_faults g, resume
     debug '22122', JSON.stringify faults
-    T.eq faults, [{"reference":"f.js","comparison":"g.js","fix":"coffee -c f.coffee"}]
+    T.eq faults, [{"effect":"f.js","cause":"g.js","fix":"coffee -c f.coffee"}]
     help JSON.stringify fault for fault in faults
     #.......................................................................................................
     yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
@@ -274,7 +274,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
     faults = yield TC.find_faults g, resume
     debug '22122', JSON.stringify faults
-    T.eq faults, [{"reference":"g.js","comparison":"g.coffee","fix":"coffee -c g.coffee"},{"reference":"f.js","comparison":"f.coffee","fix":"coffee -c f.coffee"},{"reference":"f.js","comparison":"g.js","fix":"coffee -c f.coffee"}]
+    T.eq faults, [{"effect":"g.js","cause":"g.coffee","fix":"coffee -c g.coffee"},{"effect":"f.js","cause":"f.coffee","fix":"coffee -c f.coffee"},{"effect":"f.js","cause":"g.js","fix":"coffee -c f.coffee"}]
     first_fault = yield TC.find_first_fault g, resume
     T.eq first_fault, faults[ 0 ]
     help JSON.stringify fault for fault in faults
@@ -294,24 +294,42 @@ templates_home            = PATH.resolve test_data_home, 'templates'
       help stdout
     #.......................................................................................................
     T.eq fix_count, 2
+    info TC.get_boxed_chart g
+    help g
     done()
   #.........................................................................................................
   return null
 
-    # #.......................................................................................................
-    # T.eq fix_1, fix_2
-    # #.......................................................................................................
-    # if fix_2 is fix_1
-    #   fix = fix_2.replace /^bash:\s*/, ''
-    #   { stderr, stdout, } = yield TC.HELPERS.shell g, fix, resume
-    #   T.eq stderr, ''
-    #   T.eq stdout, ''
-    #   fault_3 = yield TC.find_first_fault g, resume
-    #   T.eq fault_3, null
-    # #.......................................................................................................
-    # else
-    #   T.fail "expected #{rpr fix_1}, got #{rpr fix_2}"
-    # #.......................................................................................................
+#-----------------------------------------------------------------------------------------------------------
+@[ "toposort of fixes" ] = ( T, done ) ->
+  step ( resume ) =>
+    g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
+    @_procure_test_files()
+    #.......................................................................................................
+    fix_1       = [ 'bash', 'coffee -c f.coffee', ]
+    fix_2       = [ 'bash', 'coffee -c g.coffee', ]
+    TC.register g, 'f.coffee',  'f.js', fix_1
+    TC.register g, 'g.coffee',  'g.js', fix_2
+    TC.register g, 'g.js',      'f.js', fix_1
+    #.......................................................................................................
+    yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
+    # urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
+    faults = yield TC.find_faults g, resume
+    # debug '22122', JSON.stringify faults
+    # T.eq faults, [{"effect":"g.js","cause":"g.coffee","fix":"coffee -c g.coffee"},{"effect":"f.js","cause":"f.coffee","fix":"coffee -c f.coffee"},{"effect":"f.js","cause":"g.js","fix":"coffee -c f.coffee"}]
+    # first_fault = yield TC.find_first_fault g, resume
+    # T.eq first_fault, faults[ 0 ]
+    help JSON.stringify fault for fault in faults
+    #.......................................................................................................
+    info TC.get_boxed_chart g
+    help g
+    done()
+  #.........................................................................................................
+  return null
 
 
 ############################################################################################################
@@ -321,9 +339,10 @@ unless module.parent?
     "register file objects"
     "find fault(s) (1)"
     "find fault(s) (non-existent file)"
-    "fix fault(s) (simple case) (1)"
+    "find single fault"
     "find multiple faults"
     "fix multiple faults"
+    "toposort of fixes"
     ]
   @_prune()
   @_main()

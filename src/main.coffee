@@ -63,9 +63,10 @@ PATH                      = require 'path'
 @register = ( me, cause, effect, fix ) ->
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
-  throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of fix    ) is 'text'
+  # throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of fix    ) is 'text'
   rc_key                  = @_get_rc_key me, cause, effect
-  me[ 'fixes' ][ rc_key ] = fix
+  nfo                     = { cause, effect, fix, }
+  me[ 'fixes' ][ rc_key ] = nfo
   LTSORT.add me[ 'graph' ], cause, effect
   @_reset_chart me
   return null
@@ -181,16 +182,18 @@ PATH                      = require 'path'
         #...................................................................................................
         continue if cmp_trending_idx < ref_trend_idx
         #...................................................................................................
-        entry =
-          reference:  ref_name
-          comparison: cmp_name
-          fix:        @get_fix me, cmp_name, ref_name, null
+        # entry =
+        #   reference:  ref_name
+        #   comparison: cmp_name
+        nfo   = @get_fix me, cmp_name, ref_name, null
+        nfo  ?= { cause: comparison, effect: reference, fix: null, }
+        nfo   = Object.assign {}, nfo
         #...................................................................................................
         if first_only
-          handler null, entry
+          handler null, nfo
           return null
         #...................................................................................................
-        R.push entry
+        R.push nfo
     #.......................................................................................................
     handler null, R
     return null
