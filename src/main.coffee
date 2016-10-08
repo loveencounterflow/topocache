@@ -44,7 +44,6 @@ PATH                      = require 'path'
     'anchors':    {}
   #.........................................................................................................
   @_reset_chart R
-  @_reset_trend R
   #.........................................................................................................
   return R
 
@@ -55,47 +54,7 @@ PATH                      = require 'path'
   return me
 
 #-----------------------------------------------------------------------------------------------------------
-@_reset_trend = ( me ) ->
-  me[ 'boxed-trend'   ] = null
-  me[ 'indexed-trend' ] = null
-  return me
-
-#-----------------------------------------------------------------------------------------------------------
 @_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
-
-
-#===========================================================================================================
-#
-#-----------------------------------------------------------------------------------------------------------
-@HELPERS = {}
-
-#-----------------------------------------------------------------------------------------------------------
-@HELPERS.file_stamper = ( me, path, handler ) =>
-  step ( resume ) =>
-    locator = PATH.resolve me[ 'home' ], path
-    try
-      stat  = yield ( require 'fs' ).stat locator, resume
-      Z     = +stat[ 'mtime' ]
-    catch error
-      throw error unless error[ 'code' ] is 'ENOENT'
-      ### TAINT use special value to signal file missing ###
-      Z = null
-    handler null, Z
-
-#-----------------------------------------------------------------------------------------------------------
-@HELPERS.shell = ( me, command, handler ) =>
-  ### TAINT consider to use `spawn` so we get safe arguments ###
-  # cwd:      PATH.resolve __dirname, '..'
-  settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
-  ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
-    return handler error if error?
-    return handler null, { stdout, stderr, }
-
-#-----------------------------------------------------------------------------------------------------------
-@HELPERS.touch = ( me, path, handler ) =>
-  ### TAINT must properly escape path unless you know what you're doing ###
-  locator = PATH.resolve me[ 'home' ], path
-  @HELPERS.shell me, "touch #{locator}", handler
 
 
 #===========================================================================================================
@@ -142,33 +101,37 @@ PATH                      = require 'path'
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
-  if ( Z = me[ 'boxed-trend' ] )?
-    setImmediate -> handler null, Z
-    return null
   #.........................................................................................................
   step ( resume ) =>
     Z         = []
-    collector = {}
-    for id of @get_indexed_chart me
-      t = yield me[ 'stamper' ] me, id, resume
-      unless CND.isa_number t
-        return handler new Error "expected a number for timestamp of #{rpr id}, got #{rpr t}"
-      ( collector[ t ] ?= [] ).push id
-    Z.push collector[ t ] for t in ( Object.keys collector ).sort()
-    handler null, me[ 'boxed-trend' ] = Z
+    collector = new Map()
+    #.......................................................................................................
+    for box in @get_boxed_chart me
+      for id in box
+        timestamp = yield me[ 'stamper' ] me, id, resume
+        unless CND.isa_number timestamp
+          return handler new Error "expected a number for timestamp of #{rpr id}, got #{rpr timestamp}"
+        unless ( target = collector.get timestamp )?
+          target = []
+          collector.set timestamp, target
+        target.push id
+    #.......................................................................................................
+    timestamps = Array.from collector.keys()
+    timestamps.sort ( a, b ) ->
+      return +1 if a > b
+      return -1 if a < b
+      return  0
+    ( Z.push collector.get timestamp ) for timestamp in timestamps
+    handler null, Z
   #.........................................................................................................
   return null
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_indexed_trend = ( me, handler ) ->
-  if ( Z = me[ 'indexed-trend' ] )?
-    setImmediate -> handler null, Z
-    return null
   #.........................................................................................................
   step ( resume ) =>
     boxed_trend = yield @fetch_boxed_trend me, resume
-    Z           = me[ 'indexed-trend' ] = @_indexed_from_boxed_series me, boxed_trend
-    handler null, Z
+    handler null, @_indexed_from_boxed_series me, boxed_trend
   #.........................................................................................................
   return null
 
@@ -189,7 +152,6 @@ PATH                      = require 'path'
 #-----------------------------------------------------------------------------------------------------------
 @_find_faults = ( me, first_only, handler ) ->
   step ( resume ) =>
-    @_reset_trend me
     boxed_chart   = @get_boxed_chart    me
     indexed_chart = @get_indexed_chart  me
     indexed_trend = yield @fetch_indexed_trend me, resume
@@ -235,6 +197,39 @@ PATH                      = require 'path'
   #.........................................................................................................
   return null
 
+
+#===========================================================================================================
+#
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS = {}
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.file_stamper = ( me, path, handler ) =>
+  step ( resume ) =>
+    locator = PATH.resolve me[ 'home' ], path
+    try
+      stat  = yield ( require 'fs' ).stat locator, resume
+      Z     = +stat[ 'mtime' ]
+    catch error
+      throw error unless error[ 'code' ] is 'ENOENT'
+      ### TAINT use special value to signal file missing ###
+      Z = null
+    handler null, Z
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.shell = ( me, command, handler ) =>
+  ### TAINT consider to use `spawn` so we get safe arguments ###
+  # cwd:      PATH.resolve __dirname, '..'
+  settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
+  ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
+    return handler error if error?
+    return handler null, { stdout, stderr, }
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.touch = ( me, path, handler ) =>
+  ### TAINT must properly escape path unless you know what you're doing ###
+  locator = PATH.resolve me[ 'home' ], path
+  @HELPERS.shell me, "touch #{locator}", handler
 
 
 
