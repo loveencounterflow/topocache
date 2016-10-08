@@ -279,18 +279,21 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     T.eq first_fault, faults[ 0 ]
     help JSON.stringify fault for fault in faults
     #.......................................................................................................
-    count = 0
+    fix_count = 0
     while ( fault = yield TC.find_first_fault g, resume )?
       urge fault
-      count += +1
-      if count > 10
+      fix_count += +1
+      if fix_count > 10
         T.fail "runaway loop?"
         break
       { fix, }            = fault
       { stdout, stderr, } = yield TC.HELPERS.shell g, fix, resume
       T.eq stdout, ''
       T.eq stderr, ''
+      { stdout, stderr, } = yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
+      help stdout
     #.......................................................................................................
+    T.eq fix_count, 2
     done()
   #.........................................................................................................
   return null
