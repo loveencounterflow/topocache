@@ -37,14 +37,17 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 
 #-----------------------------------------------------------------------------------------------------------
 @_procure_test_files = ->
+  file_count = 0
   for filename in FS.readdirSync templates_home
+    file_count += +1
     source_path = PATH.resolve templates_home, filename
     target_path = PATH.resolve test_data_home, filename
     byte_count  = @_copy_file_sync source_path, target_path
-    whisper """
-      copied #{byte_count} bytes
-      from #{source_path}
-      to   #{target_path}"""
+    # whisper """
+    #   copied #{byte_count} bytes
+    #   from #{source_path}
+    #   to   #{target_path}"""
+  whisper "copied #{file_count} files"
 
 #-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
@@ -83,8 +86,9 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "register file objects" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    g           = TC.new_cache()
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', 'bash:coffee -c test-data'
+    home        = PATH.resolve __dirname, '../test-data'
+    g           = TC.new_cache { home, }
+    TC.register g, 'f.coffee', 'f.js', 'bash:coffee -c test-data'
     boxed_chart = TC.get_boxed_chart g
     urge '55444', boxed_chart
     urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
@@ -93,7 +97,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     done()
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "find fault(s) (simple case)" ] = ( T, done ) ->
+@[ "find fault(s) (1)" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
     #.......................................................................................................
@@ -101,7 +105,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     g           = TC.new_cache { home, }
     yield TC.HELPERS.touch g, 'f.coffee', resume
     #.......................................................................................................
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', 'bash:coffee -c test-data'
+    TC.register g, 'f.coffee', 'f.js', 'bash:coffee -c test-data'
     boxed_chart =         TC.get_boxed_chart g
     boxed_trend = yield TC.fetch_boxed_trend g, resume
     first_fault = yield TC.find_first_fault  g, resume
@@ -110,10 +114,39 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     urge JSON.stringify boxed_trend
     urge JSON.stringify first_fault
     urge JSON.stringify faults
-    T.eq boxed_chart, [["test-data/f.coffee"],["test-data/f.js"]]
-    T.eq boxed_trend, [["test-data/f.js"],["test-data/f.coffee"]]
-    T.eq first_fault, {"reference":"test-data/f.js","comparison":"test-data/f.coffee","fix":"bash:coffee -c test-data"}
-    T.eq faults,      [{"reference":"test-data/f.js","comparison":"test-data/f.coffee","fix":"bash:coffee -c test-data"}]
+    T.eq boxed_chart, [["f.coffee"],["f.js"]]
+    T.eq boxed_trend, [["f.js"],["f.coffee"]]
+    T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
+    T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
+    done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "find fault(s) (non-existent file)" ] = ( T, done ) ->
+  step ( resume ) =>
+    @_procure_test_files()
+    #.......................................................................................................
+    home        = PATH.resolve __dirname, '../test-data'
+    g           = TC.new_cache { home, }
+    yield TC.HELPERS.touch g, 'f.coffee', resume
+    #.......................................................................................................
+    TC.register g, 'f.coffee', 'no-such-file.js', 'bash:coffee -c test-data'
+    # boxed_chart =         TC.get_boxed_chart g
+    # T.throws "expected an integer number, got null", -> yield TC.fetch_boxed_trend g, resume
+    try
+      yield TC.fetch_boxed_trend g, resume
+    catch error
+      debug JSON.stringify error[ 'message' ]
+      T.eq error[ 'message' ], "expected a number for timestamp of 'no-such-file.js', got null"
+    # first_fault = yield TC.find_first_fault  g, resume
+    # faults      = yield TC.find_faults       g, resume
+    # urge JSON.stringify boxed_chart
+    # urge JSON.stringify boxed_trend
+    # urge JSON.stringify first_fault
+    # urge JSON.stringify faults
+    # T.eq boxed_chart, [["f.coffee"],["f.js"]]
+    # T.eq boxed_trend, [["f.js"],["f.coffee"]]
+    # T.eq first_fault, {"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}
+    # T.eq faults,      [{"reference":"f.js","comparison":"f.coffee","fix":"bash:coffee -c test-data"}]
     done()
 
 #-----------------------------------------------------------------------------------------------------------
@@ -127,10 +160,9 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     fix_1       = 'bash:coffee -c .'
     TC.register g, 'f.coffee', 'f.js', fix_1
-    fault_2     = yield TC.find_first_fault  g, resume
+    fault_2     = yield TC.find_first_fault g, resume
     if fault_2? then fix_2 = fault_2[ 'fix' ]
     else             fix_2 = undefined
-    debug '76765', fault_2, fix_2
     #.......................................................................................................
     T.eq fix_1, fix_2
     #.......................................................................................................
@@ -159,12 +191,13 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     fix_1       = 'bash:coffee -c f.coffee'
     fix_2       = 'bash:coffee -c g.coffee'
-    debug '12000', yield TC.find_faults g, resume
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', fix_1
-    debug '12000', yield TC.find_faults g, resume
-    TC.register g, 'test-data/g.coffee', 'test-data/g.js', fix_1
-    debug '12000', yield TC.find_faults g, resume
-    debug '30331', g
+    TC.register g, 'f.coffee', 'f.js', fix_1
+    TC.register g, 'g.coffee', 'g.js', fix_1
+    T.eq ( yield TC.find_faults g, resume ), []
+    yield TC.HELPERS.touch g, 'f.coffee', resume
+    help '40201', TC.get_boxed_chart g
+    urge '40201', yield TC.fetch_boxed_trend g, resume
+    # debug '40201', ( yield TC.find_faults g, resume )
     for fault in yield TC.find_faults g, resume
       help JSON.stringify fault
     fault_2     = yield TC.find_first_fault g, resume
@@ -194,7 +227,8 @@ unless module.parent?
   include = [
     "create cache object"
     "register file objects"
-    "find fault(s) (simple case)"
+    "find fault(s) (1)"
+    "find fault(s) (non-existent file)"
     "fix fault(s) (simple case) (1)"
     "fix multiple faults"
     ]

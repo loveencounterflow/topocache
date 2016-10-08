@@ -151,6 +151,8 @@ PATH                      = require 'path'
     collector = {}
     for id of @get_indexed_chart me
       t = yield me[ 'stamper' ] me, id, resume
+      unless CND.isa_number t
+        return handler new Error "expected a number for timestamp of #{rpr id}, got #{rpr t}"
       ( collector[ t ] ?= [] ).push id
     Z.push collector[ t ] for t in ( Object.keys collector ).sort()
     handler null, me[ 'boxed-trend' ] = Z
