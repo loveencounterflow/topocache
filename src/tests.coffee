@@ -304,29 +304,31 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "toposort of fixes" ] = ( T, done ) ->
   step ( resume ) =>
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
-    @_procure_test_files()
+    # @_procure_test_files()
     #.......................................................................................................
     fix_1       = [ 'bash', 'coffee -c f.coffee', ]
     fix_2       = [ 'bash', 'coffee -c g.coffee', ]
     TC.register g, 'f.coffee',  'f.js', fix_1
     TC.register g, 'g.coffee',  'g.js', fix_2
     TC.register g, 'g.js',      'f.js', fix_1
-    #.......................................................................................................
-    yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
-    # urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
-    # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
-    faults = yield TC.find_faults g, resume
-    # debug '22122', JSON.stringify faults
-    # T.eq faults, [{"effect":"g.js","cause":"g.coffee","fix":"coffee -c g.coffee"},{"effect":"f.js","cause":"f.coffee","fix":"coffee -c f.coffee"},{"effect":"f.js","cause":"g.js","fix":"coffee -c f.coffee"}]
-    # first_fault = yield TC.find_first_fault g, resume
-    # T.eq first_fault, faults[ 0 ]
-    help JSON.stringify fault for fault in faults
+    # #.......................................................................................................
+    # yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
+    # faults = yield TC.find_faults g, resume
+    # help JSON.stringify fault for fault in faults
     #.......................................................................................................
     info TC.get_boxed_chart g
-    help g
+    # help g
+    fxg = TC.new_cache()
+    for _, relation of g[ 'fixes' ]
+      { cause, effect, fix, } = relation
+      whisper "#{rpr cause} >—— #{rpr fix} ——> #{rpr effect}"
+      fix_txt = if CND.isa_text fix then fix else JSON.stringify fix
+      TC.register fxg, cause,   fix_txt
+      TC.register fxg, fix_txt, effect
+    urge TC.get_boxed_chart fxg
     done()
   #.........................................................................................................
   return null

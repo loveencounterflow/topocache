@@ -60,13 +60,13 @@ PATH                      = require 'path'
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-@register = ( me, cause, effect, fix ) ->
+@register = ( me, cause, effect, fix = null ) ->
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
   # throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of fix    ) is 'text'
-  rc_key                  = @_get_rc_key me, cause, effect
-  nfo                     = { cause, effect, fix, }
-  me[ 'fixes' ][ rc_key ] = nfo
+  rc_key                  = @_get_cause_effect_key me, cause, effect
+  relation                = { cause, effect, fix, }
+  me[ 'fixes' ][ rc_key ] = relation
   LTSORT.add me[ 'graph' ], cause, effect
   @_reset_chart me
   return null
@@ -75,14 +75,14 @@ PATH                      = require 'path'
 @get_fix = ( me, cause, effect, fallback ) ->
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of cause  ) is 'text'
   throw new Error "expected a text, got a #{type}" unless ( type = CND.type_of effect ) is 'text'
-  rc_key                  = @_get_rc_key me, cause, effect
+  rc_key                  = @_get_cause_effect_key me, cause, effect
   unless ( R = me[ 'fixes' ][ rc_key ] )?
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
     R = fallback
   return R
 
 #-----------------------------------------------------------------------------------------------------------
-@_get_rc_key = ( me, cause, effect ) ->
+@_get_cause_effect_key = ( me, cause, effect ) ->
   ### TAINT use URLs for RC keys? ###
   return "#{effect} -> #{cause}"
 
@@ -182,18 +182,15 @@ PATH                      = require 'path'
         #...................................................................................................
         continue if cmp_trending_idx < ref_trend_idx
         #...................................................................................................
-        # entry =
-        #   reference:  ref_name
-        #   comparison: cmp_name
-        nfo   = @get_fix me, cmp_name, ref_name, null
-        nfo  ?= { cause: comparison, effect: reference, fix: null, }
-        nfo   = Object.assign {}, nfo
+        relation  = @get_fix me, cmp_name, ref_name, null
+        relation ?= { cause: comparison, effect: reference, fix: null, }
+        relation  = Object.assign {}, relation
         #...................................................................................................
         if first_only
-          handler null, nfo
+          handler null, relation
           return null
         #...................................................................................................
-        R.push nfo
+        R.push relation
     #.......................................................................................................
     handler null, R
     return null
