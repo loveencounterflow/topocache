@@ -142,7 +142,9 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     if fix_2 is fix_1
       fix = fix_2.replace /^bash:\s*/, ''
-      debug '33425', yield TC.HELPERS.shell fix, resume
+      { stderr, stdout, } = yield TC.HELPERS.shell fix, resume
+      T.eq stderr, ''
+      T.eq stdout, ''
       fault_3 = yield TC.find_first_fault g, resume
       T.eq fault_3, null
     #.......................................................................................................
