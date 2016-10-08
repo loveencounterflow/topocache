@@ -49,7 +49,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @_touch = ( path, handler ) ->
   ### TAINT must properly escape path unless you know what you're doing ###
-  TC._shell "touch #{path}", handler
+  TC.HELPERS.shell "touch #{path}", handler
 
 #-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
@@ -81,103 +81,21 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "create cache object" ] = ( T, done ) ->
   g           = TC.new_cache()
   home        = PATH.resolve __dirname, '..'
-  TC.URL.set_anchor g, 'file', home
-  T.eq g[ 'anchors' ][ 'file' ],  home
+  T.ok g[ 'stamper' ] is TC.HELPERS.file_stamper
   done()
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "register file objects" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    #.......................................................................................................
     g           = TC.new_cache()
-    home        = PATH.resolve __dirname, '..'
-    TC.URL.set_anchor g, 'file', home
-    #.......................................................................................................
-    urls =
-      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
-    #.......................................................................................................
-    TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', 'bash:coffee -c test-data'
     boxed_chart = TC.get_boxed_chart g
     urge '55444', boxed_chart
     urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
     warn yield TC.find_first_fault  g, resume
     urge yield TC.find_faults       g, resume
     done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "can not set anchor after adding dependencies" ] = ( T, done ) ->
-  g           = TC.new_cache()
-  TC.register g, 'file:///test-data/f.coffee', 'file:///test-data/f.js', [ 'bash', 'coffee -c test-data', ]
-  T.throws "unable to set anchor after adding dependency", -> TC.URL.set_anchor g, 'file', '/baz'
-  done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "relative paths are roundtrip-invariant" ] = ( T, done ) ->
-  g           = TC.new_cache()
-  #.........................................................................................................
-  probes = [
-    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
-    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
-    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
-    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
-    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
-    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
-    ]
-  #.........................................................................................................
-  for { anchor, path_1, } in probes
-    is_absolute = path_1.startsWith '/'
-    rel_path    = TC.URL._get_relative_path null, anchor, path_1
-    path_2      = TC.URL._get_absolute_path null, anchor, rel_path
-    path_2      = PATH.relative anchor, path_2 unless is_absolute
-    #.......................................................................................................
-    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green rel_path ), ( CND.steel path_2 )
-    # help '77687', rel_path
-    # warn '77687', path_2
-    T.eq path_1, path_2
-  #.........................................................................................................
-  done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "file URLs are roundtrip-invariant" ] = ( T, done ) ->
-  implicit_anchor = PATH.resolve '.'
-  #.........................................................................................................
-  probes = [
-    { anchor: '/somewhere',   path_1: 'foo',            }
-    { anchor: '/somewhere',   path_1: '/foo',           }
-    { anchor: null,           path_1: 'foo',            }
-    { anchor: null,           path_1: '/foo',           }
-    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
-    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
-    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
-    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
-    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
-    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
-    ]
-  #.........................................................................................................
-  for { anchor, path_1, matcher, } in probes
-    g               = TC.new_cache()
-    TC.URL.set_anchor g, 'file', anchor if anchor?
-    is_relative     = not path_1.startsWith '/'
-    url             = TC.URL.join g, 'file', path_1
-    [ _, path_2, ]  = TC.URL.split g, url
-    matcher         = PATH.resolve ( anchor ? implicit_anchor ), path_1
-    #.......................................................................................................
-    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green url ), ( CND.steel path_2 )
-    # debug '77687', JSON.stringify { anchor, path_1, matcher: path_2, }
-    T.eq path_2, matcher
-  #.........................................................................................................
-  done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "only file URLs are relativized / absolutized" ] = ( T, done ) ->
-  g               = TC.new_cache()
-  TC.URL.set_anchor g, 'file', anchor if anchor?
-  T.eq ( TC.URL.join  g,                 [ 'bash', 'coffee -c test-data', ]... ), 'bash:///coffee -c test-data'
-  T.eq ( TC.URL.split g, TC.URL.join g,  [ 'bash', 'coffee -c test-data', ]... ), [ 'bash', 'coffee -c test-data', ]
-  #.........................................................................................................
-  done()
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "find fault(s) (simple case)" ] = ( T, done ) ->
@@ -187,13 +105,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     g           = TC.new_cache()
     home        = PATH.resolve __dirname, '..'
-    TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
-    urls =
-      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
-    #.......................................................................................................
-    TC.register g, urls.f_coffee, urls.f_js, [ 'bash', 'coffee -c test-data', ]
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', 'bash:coffee -c test-data'
     boxed_chart =         TC.get_boxed_chart g
     boxed_trend = yield TC.fetch_boxed_trend g, resume
     first_fault = yield TC.find_first_fault  g, resume
@@ -202,10 +115,10 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     urge JSON.stringify boxed_trend
     urge JSON.stringify first_fault
     urge JSON.stringify faults
-    T.eq boxed_chart, [["file:///test-data/f.coffee"],["file:///test-data/f.js"]]
-    T.eq boxed_trend, [["file:///test-data/f.js"],["file:///test-data/f.coffee"]]
-    T.eq first_fault, {"reference":"file:///test-data/f.js","comparison":"file:///test-data/f.coffee","fix":["bash","coffee -c test-data"]}
-    T.eq faults,      [{"reference":"file:///test-data/f.js","comparison":"file:///test-data/f.coffee","fix":["bash","coffee -c test-data"]}]
+    T.eq boxed_chart, [["test-data/f.coffee"],["test-data/f.js"]]
+    T.eq boxed_trend, [["test-data/f.js"],["test-data/f.coffee"]]
+    T.eq first_fault, {"reference":"test-data/f.js","comparison":"test-data/f.coffee","fix":"bash:coffee -c test-data"}
+    T.eq faults,      [{"reference":"test-data/f.js","comparison":"test-data/f.coffee","fix":"bash:coffee -c test-data"}]
     done()
 
 #-----------------------------------------------------------------------------------------------------------
@@ -216,72 +129,27 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     g           = TC.new_cache()
     home        = PATH.resolve __dirname, '..'
-    TC.URL.set_anchor g, 'file', home
     #.......................................................................................................
-    urls =
-      f_coffee:           TC.URL.join g, 'file', 'test-data/f.coffee'
-      f_js:               TC.URL.join g, 'file', 'test-data/f.js'
-    #.......................................................................................................
-    protocol_1  = 'bash'
-    advice_1    = 'coffee -c test-data'
-    TC.register g, urls.f_coffee, urls.f_js, [ protocol_1, advice_1, ]
+    # fix_1    = -> TC.HELPERS.shell 'coffee -c test-data'
+    fix_1       = 'bash:coffee -c test-data'
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', fix_1
     fault_2     = yield TC.find_first_fault  g, resume
-    if fault_2? then { fix: [ protocol_2, advice_2, ], } = fault_2
-    else                    [ protocol_2, advice_2, ] = [ undefined, undefined, ]
-    debug '76765', fault_2, protocol_2, advice_2
+    if fault_2? then fix_2 = fault_2[ 'fix' ]
+    else             fix_2 = undefined
+    debug '76765', fault_2, fix_2
     #.......................................................................................................
-    T.eq protocol_1,  protocol_2
-    T.eq advice_1,    advice_2
+    T.eq fix_1, fix_2
     #.......................................................................................................
-    if protocol_2 is protocol_1
-      debug '33425', yield TC._shell advice_2, resume
-      fault_3 = yield TC.find_first_fault  g, resume
+    if fix_2 is fix_1
+      fix = fix_2.replace /^bash:\s*/, ''
+      debug '33425', yield TC.HELPERS.shell fix, resume
+      fault_3 = yield TC.find_first_fault g, resume
       T.eq fault_3, null
     #.......................................................................................................
     else
-      T.fail "expected #{rpr protocol_1}, got #{rpr protocol_2}"
+      T.fail "expected #{rpr fix_1}, got #{rpr fix_2}"
     #.......................................................................................................
     done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "URL.is_url" ] = ( T, done ) ->
-  probes_and_matchers = [
-    [ null,                                            no,  ]
-    [ '',                                              no,  ]
-    [ [ 'file', 'foo/bar', ],                          no,  ]
-    [ 'foo/bar',                                       no,  ]
-    [ 'file://foo/bar',                                yes, ]
-    [ 'file:///foo/bar',                               yes, ]
-    [ 'file:///~foo/bar',                              yes, ]
-    [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', yes, ]
-    ]
-  #.........................................................................................................
-  for [ probe, matcher, ] in probes_and_matchers
-    urge ( CND.white rpr probe ), ( CND.truth TC.URL.is_url null, probe )
-    T.eq ( TC.URL.is_url null, probe ), matcher
-  #.........................................................................................................
-  done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "URL.from" ] = ( T, done ) ->
-  g                   = TC.new_cache()
-  probes_and_matchers = [
-    # [ [ null,                                            ], null,  ]
-    [ [ '',                                              ], null,  ]
-    [ [ [ 'file', 'foo/bar', ],                          ], null,  ]
-    [ [ [ 'http', 'domain.com/foo/bar', ],                          ], null,  ]
-    [ [ 'foo/bar',                                       ], null,  ]
-    [ [ 'file://foo/bar',                                ], null, ]
-    [ [ 'file:///foo/bar',                               ], null, ]
-    [ [ 'file:///~foo/bar',                              ], null, ]
-    [ [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', ], null, ]
-    ]
-  #.........................................................................................................
-  for [ probe, matcher, ] in probes_and_matchers
-    urge ( CND.white rpr probe ), ( CND.gold rpr TC.URL.from g, probe... )
-    # T.eq ( TC.URL.is_url null, probe ), matcher
-  #.........................................................................................................
-  done()
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "fix fault(s) (simple case) (2)" ] = ( T, done ) ->
@@ -290,21 +158,20 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     yield @_touch ( PATH.resolve __dirname, '../test-data/f.coffee' ), resume
     #.......................................................................................................
     g           = TC.new_cache()
-    TC.URL.set_anchor g, 'file', ( PATH.resolve __dirname, '..' )
     #.......................................................................................................
     protocol_1  = 'bash'
-    advice_1    = 'coffee -c test-data'
-    TC.register g, 'test-data/f.coffee', 'test-data/f.js', [ protocol_1, advice_1, ]
+    fix_1    = 'coffee -c test-data'
+    TC.register g, 'test-data/f.coffee', 'test-data/f.js', [ protocol_1, fix_1, ]
     fault_2     = yield TC.find_first_fault g, resume
-    # if fault_2? then { fix: [ protocol_2, advice_2, ], } = fault_2
-    # else                    [ protocol_2, advice_2, ] = [ undefined, undefined, ]
-    # debug '76765', fault_2, protocol_2, advice_2
+    # if fault_2? then { fix: [ protocol_2, fix_2, ], } = fault_2
+    # else                    [ protocol_2, fix_2, ] = [ undefined, undefined, ]
+    # debug '76765', fault_2, protocol_2, fix_2
     # #.......................................................................................................
     # T.eq protocol_1,  protocol_2
-    # T.eq advice_1,    advice_2
+    # T.eq fix_1,    fix_2
     # #.......................................................................................................
     # if protocol_2 is protocol_1
-    #   debug '33425', yield TC._shell advice_2, resume
+    #   debug '33425', yield TC.HELPERS.shell fix_2, resume
     #   fault_3 = yield TC.find_first_fault  g, resume
     #   T.eq fault_3, null
     # #.......................................................................................................
@@ -320,15 +187,9 @@ unless module.parent?
   include = [
     "create cache object"
     "register file objects"
-    "can not set anchor after adding dependencies"
-    "relative paths are roundtrip-invariant"
-    "file URLs are roundtrip-invariant"
-    "only file URLs are relativized / absolutized"
     "find fault(s) (simple case)"
     "fix fault(s) (simple case) (1)"
-    "URL.is_url"
-    "URL.from"
-    # "fix fault(s) (simple case) (2)"
+    # # "fix fault(s) (simple case) (2)"
     ]
   @_prune()
   @_main()

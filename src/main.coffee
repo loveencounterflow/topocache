@@ -24,13 +24,17 @@ LTSORT                    = require 'ltsort'
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
 #-----------------------------------------------------------------------------------------------------------
-@new_cache = ( stamper ) ->
-  throw new Error "expected a function, got a #{type}" unless ( type = CND.type_of stamper ) is 'function'
-  throw new Error "expected a function with arity 2, got one with arity #{arity}" unless stamper.length is 2
+@new_cache = ( stamper = null ) ->
+  stamper ?= @HELPERS.file_stamper
+  #.........................................................................................................
+  unless ( type = CND.type_of stamper ) is 'function'
+    throw new Error "expected a function, got a #{type}"
+  unless ( arity = stamper.length ) is 2
+    throw new Error "expected a function with arity 2, got one with arity #{arity}"
   #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
-    'graph':      LTSORT.new_graph loners: yes
+    'graph':      LTSORT.new_graph loners: no
     'fixes':      {}
     'store':      {}
     'stamper':    stamper
@@ -55,6 +59,33 @@ LTSORT                    = require 'ltsort'
 
 #-----------------------------------------------------------------------------------------------------------
 @_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
+
+
+#===========================================================================================================
+#
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS = {}
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.file_stamper = ( path, handler ) =>
+  step ( resume ) =>
+    try
+      stat  = yield ( require 'fs' ).stat path, resume
+      Z     = +stat[ 'mtime' ]
+    catch error
+      throw error unless error[ 'code' ] is 'ENOENT'
+      ### TAINT use special value to signal file missing ###
+      Z = null
+    handler null, Z
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS.shell = ( command, handler ) ->
+  ### TAINT consider to use `spawn` so we get safe arguments ###
+  # cwd:      PATH.resolve __dirname, '..'
+  settings = { encoding: 'utf-8', }
+  ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) ->
+    return handler error if error?
+    return handler null, { stdout, stderr, }
 
 
 #===========================================================================================================
@@ -90,7 +121,6 @@ LTSORT                    = require 'ltsort'
 #
 #-----------------------------------------------------------------------------------------------------------
 @get_boxed_chart = ( me ) ->
-  throw new Error "### TAINT must deal with loner events ###"
   return R if ( R = me[ 'boxed-chart' ] )?
   LTSORT.linearize me[ 'graph' ]
   return me[ 'boxed-chart' ] = LTSORT.group me[ 'graph' ]
@@ -102,7 +132,6 @@ LTSORT                    = require 'ltsort'
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
-  throw new Error "### TAINT must deal with loner events ###"
   if ( Z = me[ 'boxed-trend' ] )?
     setImmediate -> handler null, Z
     return null
@@ -147,7 +176,6 @@ LTSORT                    = require 'ltsort'
 
 #-----------------------------------------------------------------------------------------------------------
 @_find_faults = ( me, first_only, handler ) ->
-  throw new Error "### TAINT must deal with loner events ###"
   step ( resume ) =>
     @_reset_trend me
     indexed_chart = @get_indexed_chart me

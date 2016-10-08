@@ -6,7 +6,6 @@
 # URL                       = require 'url'
 # QUERYSTRING               = require 'querystring'
 # COFFEESCRIPT              = require 'coffee-script'
-# CP                        = require 'child_process'
 
 
 #-----------------------------------------------------------------------------------------------------------
@@ -47,15 +46,6 @@ stampers =
   #---------------------------------------------------------------------------------------------------------
   # method:
 
-#-----------------------------------------------------------------------------------------------------------
-@_shell = ( command, handler ) ->
-  # command       = 'ls -AlF'
-  settings =
-    cwd:      PATH.resolve __dirname, '..'
-    encoding: 'utf-8'
-  CP.exec command, settings, ( error, stdout, stderr ) ->
-    return handler error if error?
-    return handler null, { stdout, stderr, }
 
 
 #===========================================================================================================
@@ -129,3 +119,131 @@ stampers =
   stamper             = me[ 'stampers' ][ protocol ]
   return handler new Error "no stamper for protocol #{rpr protocol}" unless stamper?
   stamper.fetch_timestamp path, handler
+
+
+
+
+#===========================================================================================================
+# TESTS
+#-----------------------------------------------------------------------------------------------------------
+@[ "can not set anchor after adding dependencies" ] = ( T, done ) ->
+  g           = TC.new_cache()
+  TC.register g, 'file:///test-data/f.coffee', 'file:///test-data/f.js', [ 'bash', 'coffee -c test-data', ]
+  T.throws "unable to set anchor after adding dependency", -> TC.URL.set_anchor g, 'file', '/baz'
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "relative paths are roundtrip-invariant" ] = ( T, done ) ->
+  g           = TC.new_cache()
+  #.........................................................................................................
+  probes = [
+    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
+    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
+    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
+    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
+    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
+    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
+    ]
+  #.........................................................................................................
+  for { anchor, path_1, } in probes
+    is_absolute = path_1.startsWith '/'
+    rel_path    = TC.URL._get_relative_path null, anchor, path_1
+    path_2      = TC.URL._get_absolute_path null, anchor, rel_path
+    path_2      = PATH.relative anchor, path_2 unless is_absolute
+    #.......................................................................................................
+    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green rel_path ), ( CND.steel path_2 )
+    # help '77687', rel_path
+    # warn '77687', path_2
+    T.eq path_1, path_2
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "file URLs are roundtrip-invariant" ] = ( T, done ) ->
+  implicit_anchor = PATH.resolve '.'
+  #.........................................................................................................
+  probes = [
+    { anchor: '/somewhere',   path_1: 'foo',            }
+    { anchor: '/somewhere',   path_1: '/foo',           }
+    { anchor: null,           path_1: 'foo',            }
+    { anchor: null,           path_1: '/foo',           }
+    { anchor: '/somewhere',   path_1: '/foo/bar/baz',   }
+    { anchor: '/foo',         path_1: '/foo/bar/baz',   }
+    { anchor: '/baz',         path_1: '/foo/bar/baz',   }
+    { anchor: '/somewhere',   path_1: 'foo/bar/baz',    }
+    { anchor: '/foo',         path_1: 'foo/bar/baz',    }
+    { anchor: '/baz',         path_1: 'foo/bar/baz',    }
+    ]
+  #.........................................................................................................
+  for { anchor, path_1, matcher, } in probes
+    g               = TC.new_cache()
+    TC.URL.set_anchor g, 'file', anchor if anchor?
+    is_relative     = not path_1.startsWith '/'
+    url             = TC.URL.join g, 'file', path_1
+    [ _, path_2, ]  = TC.URL.split g, url
+    matcher         = PATH.resolve ( anchor ? implicit_anchor ), path_1
+    #.......................................................................................................
+    warn '77687', ( CND.red path_1 ), ( CND.gold anchor ), ( CND.green url ), ( CND.steel path_2 )
+    # debug '77687', JSON.stringify { anchor, path_1, matcher: path_2, }
+    T.eq path_2, matcher
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "only file URLs are relativized / absolutized" ] = ( T, done ) ->
+  g               = TC.new_cache()
+  TC.URL.set_anchor g, 'file', anchor if anchor?
+  T.eq ( TC.URL.join  g,                 [ 'bash', 'coffee -c test-data', ]... ), 'bash:///coffee -c test-data'
+  T.eq ( TC.URL.split g, TC.URL.join g,  [ 'bash', 'coffee -c test-data', ]... ), [ 'bash', 'coffee -c test-data', ]
+  #.........................................................................................................
+  done()
+
+
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "URL.is_url" ] = ( T, done ) ->
+  probes_and_matchers = [
+    [ null,                                            no,  ]
+    [ '',                                              no,  ]
+    [ [ 'file', 'foo/bar', ],                          no,  ]
+    [ 'foo/bar',                                       no,  ]
+    [ 'file://foo/bar',                                yes, ]
+    [ 'file:///foo/bar',                               yes, ]
+    [ 'file:///~foo/bar',                              yes, ]
+    [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', yes, ]
+    ]
+  #.........................................................................................................
+  for [ probe, matcher, ] in probes_and_matchers
+    urge ( CND.white rpr probe ), ( CND.truth TC.URL.is_url null, probe )
+    T.eq ( TC.URL.is_url null, probe ), matcher
+  #.........................................................................................................
+  done()
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "URL.from" ] = ( T, done ) ->
+  g                   = TC.new_cache()
+  probes_and_matchers = [
+    # [ [ null,                                            ], null,  ]
+    [ [ '',                                              ], null,  ]
+    [ [ [ 'file', 'foo/bar', ],                          ], null,  ]
+    [ [ [ 'http', 'domain.com/foo/bar', ],                          ], null,  ]
+    [ [ 'foo/bar',                                       ], null,  ]
+    [ [ 'file://foo/bar',                                ], null, ]
+    [ [ 'file:///foo/bar',                               ], null, ]
+    [ [ 'file:///~foo/bar',                              ], null, ]
+    [ [ 'http://languagelog.ldc.upenn.edu/nll/?p=28689', ], null, ]
+    ]
+  #.........................................................................................................
+  for [ probe, matcher, ] in probes_and_matchers
+    urge ( CND.white rpr probe ), ( CND.gold rpr TC.URL.from g, probe... )
+    # T.eq ( TC.URL.is_url null, probe ), matcher
+  #.........................................................................................................
+  done()
+
+
+
+
+
+
+
+
