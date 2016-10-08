@@ -190,7 +190,8 @@ PATH                      = require 'path'
 @_find_faults = ( me, first_only, handler ) ->
   step ( resume ) =>
     @_reset_trend me
-    indexed_chart = @get_indexed_chart me
+    boxed_chart   = @get_boxed_chart    me
+    indexed_chart = @get_indexed_chart  me
     indexed_trend = yield @fetch_indexed_trend me, resume
     R             = if first_only then null else []
     #.......................................................................................................
@@ -202,31 +203,32 @@ PATH                      = require 'path'
       messages[ message ] = 1
       return null
     #.......................................................................................................
-    for ref_name, ref_charting_idx of indexed_chart
-      unless ( ref_trending_idx = indexed_trend[ ref_name ] )?
+    for ref_name, ref_chart_idx of indexed_chart
+      ref_trend_idx = indexed_trend[ ref_name ]
+      #.....................................................................................................
+      unless ref_trend_idx?
         warn_missing ref_name
         continue
       #.....................................................................................................
-      for cmp_name, cmp_charting_idx of indexed_chart
-        ### Skip entries with same or smaller charting index (that do not depend on reference): ###
-        continue if ref_charting_idx <= cmp_charting_idx
-        unless ( cmp_trending_idx = indexed_trend[ cmp_name ] )?
+      for cmp_name in me[ 'graph' ][ 'precedents' ].get ref_name
+        cmp_trending_idx = indexed_trend[ cmp_name ]
+        #...................................................................................................
+        unless cmp_trending_idx?
           warn_missing cmp_name
           continue
         #...................................................................................................
-        ### A fault is indicated by the trending index being in violation of the dependency relation
-        as expressed by the charting index: ###
-        unless ref_trending_idx > cmp_trending_idx
-          entry =
-            reference:  ref_name
-            comparison: cmp_name
-            fix:        @get_fix me, cmp_name, ref_name, null
-          #.................................................................................................
-          if first_only
-            handler null, entry
-            return null
-          #.................................................................................................
-          R.push entry
+        continue if cmp_trending_idx < ref_trend_idx
+        #...................................................................................................
+        entry =
+          reference:  ref_name
+          comparison: cmp_name
+          fix:        @get_fix me, cmp_name, ref_name, null
+        #...................................................................................................
+        if first_only
+          handler null, entry
+          return null
+        #...................................................................................................
+        R.push entry
     #.......................................................................................................
     handler null, R
     return null
