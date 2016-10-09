@@ -1,8 +1,6 @@
 
 
 
-
-
 ############################################################################################################
 CND                       = require 'cnd'
 rpr                       = CND.rpr
@@ -21,7 +19,6 @@ LTSORT                    = require 'ltsort'
 PATH                      = require 'path'
 
 
-
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
 #-----------------------------------------------------------------------------------------------------------
@@ -36,12 +33,13 @@ PATH                      = require 'path'
   #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
-    'graph':      LTSORT.new_graph loners: no
-    'fixes':      {}
-    'store':      {}
-    'stamper':    stamper
-    'home':       home
     'anchors':    {}
+    'fixes':      {}
+    'graph':      LTSORT.new_graph loners: no
+    'home':       home
+    'aligners':   {}
+    'stamper':    stamper
+    'store':      {}
   #.........................................................................................................
   @_reset_chart R
   #.........................................................................................................
@@ -51,7 +49,7 @@ PATH                      = require 'path'
 @_reset_chart = ( me ) ->
   me[ 'boxed-chart'   ] = null
   me[ 'indexed-chart' ] = null
-  return me
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
@@ -71,47 +69,19 @@ PATH                      = require 'path'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
+@register_alignment = ( me, kind, method ) ->
+  me[ 'aligners' ][ kind ] = method
+  return null
+
+#-----------------------------------------------------------------------------------------------------------
 @get_fix = ( me, cause, effect, fallback ) ->
   cause_json  = JSON.stringify cause
   effect_json = JSON.stringify effect
   rc_key      = @_get_cause_effect_key me, cause_json, effect_json
   unless ( R = me[ 'fixes' ][ rc_key ] )?
-    throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
-    R = fallback
+    return fallback unless fallback is undefined
+    throw new Error "no fix for #{rpr rc_key}"
   return R
-
-#-----------------------------------------------------------------------------------------------------------
-@apply_fixes = ( me, handler ) ->
-  step ( resume ) =>
-    runs    = []
-    Z       = { runs, t0: new Date(), }
-    #.......................................................................................................
-    while ( fault = yield @find_first_fault me, resume )?
-      return handler ( new Error "runaway loop?" ), Z if runs.length > 10
-      #.....................................................................................................
-      t0                  = new Date()
-      { fix, }            = fault
-      return handler new Error "expected a list, got a #{type}" if ( type = CND.type_of fix ) isnt 'list'
-      [ kind, command, ]  = fix
-      #.....................................................................................................
-      switch kind
-        #...................................................................................................
-        when 'shell'
-          { stdout: output, stderr: error, } = yield @HELPERS.shell me, command, resume
-        #...................................................................................................
-        else
-          return handler new Error "unknown kind of fix #{rpr kind}"
-      #.....................................................................................................
-      t1  = new Date()
-      dt  = ( t1 - t0 ) / 1000
-      run = { fault, t0, t1, dt, output, error, }
-      runs.push run
-    #.......................................................................................................
-    Z[ 't1' ] = new Date()
-    Z[ 'dt' ] = ( Z[ 't1' ] - Z[ 't0' ] ) / 1000
-    handler null, Z
-  #.........................................................................................................
-  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @_get_cause_effect_key = ( me, cause_json, effect_json ) ->
@@ -253,6 +223,55 @@ PATH                      = require 'path'
       ### TAINT use special value to signal file missing ###
       Z = null
     handler null, Z
+
+#-----------------------------------------------------------------------------------------------------------
+@align = ( me, handler ) =>
+  step ( resume ) =>
+    runs    = []
+    Z       = { runs, t0: new Date(), }
+    #.......................................................................................................
+    while ( fault = yield @find_first_fault me, resume )?
+      return handler ( new Error "runaway loop?" ), Z if runs.length > 10
+      #.....................................................................................................
+      t0                  = new Date()
+      { fix, }            = fault
+      #.....................................................................................................
+      switch type = CND.type_of fix
+        when 'text'
+          kind    = 'text'
+          command = fix
+        when 'list'
+          [ kind, command..., ] = fix
+        when 'pod'
+          { kind, } = fix
+          command   = Object.assign {}, fix
+        else
+          type = CND.type_of fix
+          return handler new Error "expected a text, a list or a POD, got a #{type}"
+      #.....................................................................................................
+      if ( method = me[ 'aligners' ][ kind ] )?
+        { error, output, } = yield method me, command, resume
+      #.....................................................................................................
+      else
+        #.....................................................................................................
+        switch kind
+          #...................................................................................................
+          when 'shell'
+            { stdout: output, stderr: error, } = yield @HELPERS.shell me, command, resume
+          #...................................................................................................
+          else
+            return handler new Error "unknown kind of fix #{rpr kind}"
+      #.....................................................................................................
+      t1  = new Date()
+      dt  = ( t1 - t0 ) / 1000
+      run = { fault, t0, t1, dt, output, error, }
+      runs.push run
+    #.......................................................................................................
+    Z[ 't1' ] = new Date()
+    Z[ 'dt' ] = ( Z[ 't1' ] - Z[ 't0' ] ) / 1000
+    handler null, Z
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS.shell = ( me, command, handler ) =>

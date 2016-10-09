@@ -2,6 +2,13 @@
 
 # TopoCache
 
+
+* **Fault**
+* **Fix**
+* **Cause** and **Effect**
+* **Chart** and **Trend**
+* **Align**
+
 ## Artefacts
 
 * (local, physical, reified) Data Sources (a.k.a. 'flat files', 'text files')

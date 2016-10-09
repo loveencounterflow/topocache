@@ -244,7 +244,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix multiple faults (1)" ] = ( T, done ) ->
+@[ "align multiple faults (1)" ] = ( T, done ) ->
   step ( resume ) =>
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
     @_procure_test_files()
@@ -301,7 +301,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix multiple faults (2)" ] = ( T, done ) ->
+@[ "align multiple faults (2)" ] = ( T, done ) ->
   step ( resume ) =>
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
     @_procure_test_files()
@@ -319,7 +319,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     debug '22122', JSON.stringify yield TC.find_faults      g, resume
     debug '22122', JSON.stringify yield TC.find_first_fault g, resume
     #.....................................................................................................
-    report = yield TC.apply_fixes g, resume
+    report = yield TC.align g, resume
     info report
     { stdout, stderr, } = yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
     help stdout
@@ -370,8 +370,8 @@ unless module.parent?
     "find fault(s) (non-existent file)"
     "find single fault"
     "find multiple faults"
-    "fix multiple faults (1)"
-    "fix multiple faults (2)"
+    "align multiple faults (1)"
+    "align multiple faults (2)"
     # "toposort of fixes"
     ]
   @_prune()
