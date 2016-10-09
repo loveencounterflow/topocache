@@ -249,7 +249,6 @@ D                         = require 'pipedreams'
           { kind, } = fix
           command   = Object.assign {}, fix
         else
-          type = CND.type_of fix
           return handler new Error "expected a text, a list or a POD, got a #{type}"
       #.....................................................................................................
       if ( method = me[ 'aligners' ][ kind ] )?
@@ -270,7 +269,7 @@ D                         = require 'pipedreams'
       #.....................................................................................................
       t1  = new Date()
       dt  = ( t1 - t0 ) / 1000
-      run = { fault, t0, t1, dt, output, }
+      run = Object.assign {}, fault, { kind, command, output, t0, t1, dt, }
       runs.push run
     #.......................................................................................................
     Z[ 't1' ] = new Date()
@@ -289,9 +288,7 @@ D                         = require 'pipedreams'
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS._shell_from_text = ( me, command, handler ) =>
-  debug '87003', '_shell_from_text', rpr command
   ### TAINT keep output length limitation in mind ###
-  # cwd:      PATH.resolve __dirname, '..'
   settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
   ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
     return handler error if error?
@@ -300,7 +297,6 @@ D                         = require 'pipedreams'
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS._shell_from_list = ( me, command, handler ) =>
-  debug '87003', '_shell_from_list', rpr command
   [ command
     parameters... ] = command
   error_lines       = []

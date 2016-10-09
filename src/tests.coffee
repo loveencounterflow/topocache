@@ -177,9 +177,8 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     #.......................................................................................................
     if fix_2 is fix_1
       fix = fix_2.replace /^bash:\s*/, ''
-      { stderr, stdout, } = yield TC.HELPERS.shell g, fix, resume
-      T.eq stderr, ''
-      T.eq stdout, ''
+      output = yield TC.HELPERS.shell g, fix, resume
+      T.eq output, ''
       fault_3 = yield TC.find_first_fault g, resume
       T.eq fault_3, null
     #.......................................................................................................
@@ -286,12 +285,10 @@ templates_home            = PATH.resolve test_data_home, 'templates'
       if fix_count > 10
         T.fail "runaway loop?"
         break
-      { fix, }            = fault
-      { stdout, stderr, } = yield TC.HELPERS.shell g, fix, resume
-      T.eq stdout, ''
-      T.eq stderr, ''
-      { stdout, stderr, } = yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
-      help stdout
+      { fix, }  = fault
+      output    = yield TC.HELPERS.shell g, fix, resume
+      T.eq output, ''
+      help yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
     #.......................................................................................................
     T.eq fix_count, 2
     info TC.get_boxed_chart g
@@ -314,15 +311,20 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
     yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
     yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
-    urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    # urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
     # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
-    debug '22122', JSON.stringify yield TC.find_faults      g, resume
-    debug '22122', JSON.stringify yield TC.find_first_fault g, resume
+    fault = yield TC.find_first_fault g, resume
+    # debug JSON.stringify fault
+    T.eq fault, {"cause":"g.coffee","effect":"g.js","fix":["shell","coffee -c g.coffee"]}
     #.....................................................................................................
     report = yield TC.align g, resume
     info report
-    { stdout, stderr, } = yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
-    help stdout
+    T.eq report[ 'runs' ]?.length, 2
+    T.eq report[ 'runs' ]?[ 0 ]?[ 'cause' ], 'g.coffee'
+    T.eq report[ 'runs' ]?[ 1 ]?[ 'cause' ], 'f.coffee'
+    T.eq report[ 'runs' ]?[ 0 ]?[ 'kind'  ], 'shell'
+    T.eq report[ 'runs' ]?[ 1 ]?[ 'kind'  ], 'shell'
+    help yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
     done()
   #.........................................................................................................
   return null
@@ -364,23 +366,23 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    # "create cache object"
-    # "register file objects"
-    # "find fault(s) (1)"
-    # "find fault(s) (non-existent file)"
-    # "find single fault"
-    # "find multiple faults"
-    # "align multiple faults (1)"
+    "create cache object"
+    "register file objects"
+    "find fault(s) (1)"
+    "find fault(s) (non-existent file)"
+    "find single fault"
+    "find multiple faults"
+    "align multiple faults (1)"
     "align multiple faults (2)"
     # "toposort of fixes"
     ]
-  # @_prune()
-  # @_main()
+  @_prune()
+  @_main()
 
   # debug '5562', JSON.stringify key for key in Object.keys @
 
   # CND.run =>
-  @[ "align multiple faults (2)" ] null, -> warn "not tested"
+  # @[ "align multiple faults (2)" ] null, -> warn "not tested"
 
 
 
