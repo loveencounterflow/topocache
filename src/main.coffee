@@ -253,7 +253,7 @@ D                         = require 'pipedreams'
           return handler new Error "expected a text, a list or a POD, got a #{type}"
       #.....................................................................................................
       if ( method = me[ 'aligners' ][ kind ] )?
-        { error, output, } = yield method me, command, resume
+        output = yield method me, command, resume
       #.....................................................................................................
       else
         #.....................................................................................................
@@ -263,14 +263,14 @@ D                         = require 'pipedreams'
             if ( arity = command.length isnt 1 )
               throw new Error "expected single argument, got #{arity} (#{rpr kind}, #{rpr command})"
             command = command[ 0 ]
-            { stdout: output, stderr: error, } = yield @HELPERS.shell me, command, resume
+            output  = yield @HELPERS.shell me, command, resume
           #...................................................................................................
           else
             return handler new Error "unknown kind of fix #{rpr kind}"
       #.....................................................................................................
       t1  = new Date()
       dt  = ( t1 - t0 ) / 1000
-      run = { fault, t0, t1, dt, output, error, }
+      run = { fault, t0, t1, dt, output, }
       runs.push run
     #.......................................................................................................
     Z[ 't1' ] = new Date()
@@ -295,7 +295,8 @@ D                         = require 'pipedreams'
   settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
   ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
     return handler error if error?
-    return handler null, { errors: stderr, output: stdout, }
+    return handler new Error stderr if stderr? and stderr.length > 0
+    return handler null, stdout
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS._shell_from_list = ( me, command, handler ) =>
@@ -303,7 +304,7 @@ D                         = require 'pipedreams'
   [ command
     parameters... ] = command
   error_lines       = []
-  result_lines      = []
+  output_lines      = []
   settings          = { cwd: me[ 'home' ], }
   cp                = ( require 'child_process' ).spawn command, parameters, settings
   # record 'shell_command', command, parameters.join ' '
@@ -311,7 +312,7 @@ D                         = require 'pipedreams'
   cp.stdout
     .pipe D.$split()
     .pipe $ ( line ) =>
-      result_lines.push line
+      output_lines.push line
       # record 'shell_command_result', line
   #.........................................................................................................
   cp.stderr
@@ -334,7 +335,7 @@ D                         = require 'pipedreams'
       alert message
       return handler new Error message
     #.......................................................................................................
-    handler null, result_lines
+    handler null, output_lines.join '\n'
   #.........................................................................................................
   return null
 
