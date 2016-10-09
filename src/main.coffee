@@ -10,13 +10,15 @@ debug                     = CND.get_logger 'debug',     badge
 # info                      = CND.get_logger 'info',      badge
 warn                      = CND.get_logger 'warn',      badge
 help                      = CND.get_logger 'help',      badge
-# urge                      = CND.get_logger 'urge',      badge
+alert                     = CND.get_logger 'alert',     badge
 # whisper                   = CND.get_logger 'whisper',   badge
 # echo                      = CND.echo.bind CND
 #...........................................................................................................
 LTSORT                    = require 'ltsort'
 { step, }                 = require 'coffeenode-suspend'
 PATH                      = require 'path'
+D                         = require 'pipedreams'
+{ $, $async, }            = D
 
 
 #===========================================================================================================
@@ -226,12 +228,13 @@ PATH                      = require 'path'
 
 #-----------------------------------------------------------------------------------------------------------
 @align = ( me, handler ) =>
+  max_run_count = ( Object.keys me[ 'fixes' ] ).length * 2
   step ( resume ) =>
     runs    = []
     Z       = { runs, t0: new Date(), }
     #.......................................................................................................
     while ( fault = yield @find_first_fault me, resume )?
-      return handler ( new Error "runaway loop?" ), Z if runs.length > 10
+      return handler ( new Error "runaway loop?" ), Z if runs.length > max_run_count
       #.....................................................................................................
       t0                  = new Date()
       { fix, }            = fault
@@ -257,6 +260,9 @@ PATH                      = require 'path'
         switch kind
           #...................................................................................................
           when 'shell'
+            if ( arity = command.length isnt 1 )
+              throw new Error "expected single argument, got #{arity} (#{rpr kind}, #{rpr command})"
+            command = command[ 0 ]
             { stdout: output, stderr: error, } = yield @HELPERS.shell me, command, resume
           #...................................................................................................
           else
@@ -275,12 +281,62 @@ PATH                      = require 'path'
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS.shell = ( me, command, handler ) =>
-  ### TAINT consider to use `spawn` so we get safe arguments ###
+  switch type = CND.type_of command
+    when 'text' then @HELPERS._shell_from_text me, command, handler
+    when 'list' then @HELPERS._shell_from_list me, command, handler
+    else handler new Error "expected a list or a text, got a #{type}"
+  return null
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS._shell_from_text = ( me, command, handler ) =>
+  debug '87003', '_shell_from_text', rpr command
+  ### TAINT keep output length limitation in mind ###
   # cwd:      PATH.resolve __dirname, '..'
   settings = { encoding: 'utf-8', cwd: me[ 'home' ], }
   ( require 'child_process' ).exec command, settings, ( error, stdout, stderr ) =>
     return handler error if error?
-    return handler null, { stdout, stderr, }
+    return handler null, { errors: stderr, output: stdout, }
+
+#-----------------------------------------------------------------------------------------------------------
+@HELPERS._shell_from_list = ( me, command, handler ) =>
+  debug '87003', '_shell_from_list', rpr command
+  [ command
+    parameters... ] = command
+  error_lines       = []
+  result_lines      = []
+  settings          = { cwd: me[ 'home' ], }
+  cp                = ( require 'child_process' ).spawn command, parameters, settings
+  # record 'shell_command', command, parameters.join ' '
+  #.........................................................................................................
+  cp.stdout
+    .pipe D.$split()
+    .pipe $ ( line ) =>
+      result_lines.push line
+      # record 'shell_command_result', line
+  #.........................................................................................................
+  cp.stderr
+    .pipe D.$split()
+    .pipe $ ( line ) =>
+      error_lines.push line
+      # debug '30322', CND.red line
+  #.........................................................................................................
+  cp.on 'close', ( code ) =>
+    message = ''
+    #.......................................................................................................
+    if error_lines.length > 0
+      # ### TAINT looks like we're getting empty lines on stderr? ###
+      # message = ( line for line in error_lines when line.length > 0 ).join '\n'
+      message = ( line for line in error_lines ).join '\n'
+    #.......................................................................................................
+    if ( code isnt 0 ) or ( message.length > 0 )
+      message += '\n' if message.length > 0
+      message += "command exited with code #{code}: #{command} #{parameters.join ' '}"
+      alert message
+      return handler new Error message
+    #.......................................................................................................
+    handler null, result_lines
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @HELPERS.touch = ( me, path, handler ) =>

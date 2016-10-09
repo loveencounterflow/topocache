@@ -306,9 +306,9 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
     @_procure_test_files()
     #.......................................................................................................
-    TC.register g, 'f.coffee',  'f.js', [ 'shell', 'coffee -c f.coffee', ]
+    TC.register g, 'f.coffee',  'f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
     TC.register g, 'g.coffee',  'g.js', [ 'shell', 'coffee -c g.coffee', ]
-    TC.register g, 'g.js',      'f.js', [ 'shell', 'coffee -c f.coffee', ]
+    TC.register g, 'g.js',      'f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
     #.......................................................................................................
     yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
     yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
@@ -364,21 +364,27 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    "create cache object"
-    "register file objects"
-    "find fault(s) (1)"
-    "find fault(s) (non-existent file)"
-    "find single fault"
-    "find multiple faults"
-    "align multiple faults (1)"
+    # "create cache object"
+    # "register file objects"
+    # "find fault(s) (1)"
+    # "find fault(s) (non-existent file)"
+    # "find single fault"
+    # "find multiple faults"
+    # "align multiple faults (1)"
     "align multiple faults (2)"
     # "toposort of fixes"
     ]
-  @_prune()
-  @_main()
+  # @_prune()
+  # @_main()
 
   # debug '5562', JSON.stringify key for key in Object.keys @
 
   # CND.run =>
-  #   @[ "register file objects" ] null, -> warn "not tested"
+  @[ "align multiple faults (2)" ] null, -> warn "not tested"
+
+
+
+
+
+
 
