@@ -11,7 +11,7 @@ log                       = CND.get_logger 'plain',     badge
 debug                     = CND.get_logger 'debug',     badge
 # info                      = CND.get_logger 'info',      badge
 warn                      = CND.get_logger 'warn',      badge
-# help                      = CND.get_logger 'help',      badge
+help                      = CND.get_logger 'help',      badge
 # urge                      = CND.get_logger 'urge',      badge
 # whisper                   = CND.get_logger 'whisper',   badge
 # echo                      = CND.echo.bind CND
@@ -79,6 +79,39 @@ PATH                      = require 'path'
     throw new Error "no fix for #{rpr rc_key}" if fallback is undefined
     R = fallback
   return R
+
+#-----------------------------------------------------------------------------------------------------------
+@apply_fixes = ( me, handler ) ->
+  step ( resume ) =>
+    runs    = []
+    Z       = { runs, t0: new Date(), }
+    #.......................................................................................................
+    while ( fault = yield @find_first_fault me, resume )?
+      return handler ( new Error "runaway loop?" ), Z if runs.length > 10
+      #.....................................................................................................
+      t0                  = new Date()
+      { fix, }            = fault
+      return handler new Error "expected a list, got a #{type}" if ( type = CND.type_of fix ) isnt 'list'
+      [ kind, command, ]  = fix
+      #.....................................................................................................
+      switch kind
+        #...................................................................................................
+        when 'shell'
+          { stdout: output, stderr: error, } = yield @HELPERS.shell me, command, resume
+        #...................................................................................................
+        else
+          return handler new Error "unknown kind of fix #{rpr kind}"
+      #.....................................................................................................
+      t1  = new Date()
+      dt  = ( t1 - t0 ) / 1000
+      run = { fault, t0, t1, dt, output, error, }
+      runs.push run
+    #.......................................................................................................
+    Z[ 't1' ] = new Date()
+    Z[ 'dt' ] = ( Z[ 't1' ] - Z[ 't0' ] ) / 1000
+    handler null, Z
+  #.........................................................................................................
+  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @_get_cause_effect_key = ( me, cause_json, effect_json ) ->

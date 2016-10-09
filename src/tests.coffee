@@ -244,7 +244,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "fix multiple faults" ] = ( T, done ) ->
+@[ "fix multiple faults (1)" ] = ( T, done ) ->
   step ( resume ) =>
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
     @_procure_test_files()
@@ -301,6 +301,33 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
+@[ "fix multiple faults (2)" ] = ( T, done ) ->
+  step ( resume ) =>
+    g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
+    @_procure_test_files()
+    #.......................................................................................................
+    TC.register g, 'f.coffee',  'f.js', [ 'shell', 'coffee -c f.coffee', ]
+    TC.register g, 'g.coffee',  'g.js', [ 'shell', 'coffee -c g.coffee', ]
+    TC.register g, 'g.js',      'f.js', [ 'shell', 'coffee -c f.coffee', ]
+    #.......................................................................................................
+    yield TC.HELPERS.touch g, 'f.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.js',     resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'g.coffee', resume; yield @_delay resume
+    yield TC.HELPERS.touch g, 'f.coffee', resume; yield @_delay resume
+    urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    # T.eq boxed_trend, [ [ 'f.coffee' ], [ 'g.coffee' ], [ 'f.js' ], [ 'g.js' ] ]
+    debug '22122', JSON.stringify yield TC.find_faults      g, resume
+    debug '22122', JSON.stringify yield TC.find_first_fault g, resume
+    #.....................................................................................................
+    report = yield TC.apply_fixes g, resume
+    info report
+    { stdout, stderr, } = yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
+    help stdout
+    done()
+  #.........................................................................................................
+  return null
+
+#-----------------------------------------------------------------------------------------------------------
 @[ "toposort of fixes" ] = ( T, done ) ->
   step ( resume ) =>
     g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
@@ -343,8 +370,9 @@ unless module.parent?
     "find fault(s) (non-existent file)"
     "find single fault"
     "find multiple faults"
-    "fix multiple faults"
-    "toposort of fixes"
+    "fix multiple faults (1)"
+    "fix multiple faults (2)"
+    # "toposort of fixes"
     ]
   @_prune()
   @_main()
