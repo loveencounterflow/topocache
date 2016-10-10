@@ -402,15 +402,15 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    # "create cache object"
-    # "register file objects"
-    # "register file objects with complex keys"
-    # "find fault(s) (1)"
-    # "find fault(s) (non-existent file)"
-    # "find single fault"
-    # "find multiple faults"
-    # "align multiple faults (1)"
-    # "align multiple faults (2)"
+    "create cache object"
+    "register file objects"
+    "register file objects with complex keys"
+    "find fault(s) (1)"
+    "find fault(s) (non-existent file)"
+    "find single fault"
+    "find multiple faults"
+    "align multiple faults (1)"
+    "align multiple faults (2)"
     "fixes can be strings, lists"
     # "toposort of fixes"
     ]
