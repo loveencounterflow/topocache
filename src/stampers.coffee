@@ -19,7 +19,7 @@ PATH                      = require 'path'
 D                         = require 'pipedreams'
 { $, $async, }            = D
 { step, }                 = require 'coffeenode-suspend'
-
+TC                        = require './main'
 
 
 #-----------------------------------------------------------------------------------------------------------

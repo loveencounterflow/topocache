@@ -1,0 +1,12 @@
+
+# Characters and the regions where they are reportedly in use
+# (C: mainland China; J: Japan; K: North and South Korea; T: Taiwan; H: Hong Kong; M: Macau).
+# Characters not followed by at least one letter may be regarded as rare or obsolete
+
+斗CJKTHM 鬥THM 闘J 鬪K 鬭 鬬 鬦 𣂑
+令CJKTHM 令
+今CJKTHM
+念CJKTHM 唸JTHM 念
+
+
+

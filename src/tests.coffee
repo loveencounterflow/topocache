@@ -19,8 +19,8 @@ TC                        = require './main'
 LTSORT                    = require 'ltsort'
 PATH                      = require 'path'
 FS                        = require 'fs'
-D                         = require 'pipedreams'
-{ $, $async, }            = D
+# D                         = require 'pipedreams'
+# { $, $async, }            = D
 { step, }                 = require 'coffeenode-suspend'
 #...........................................................................................................
 test_data_home            = PATH.resolve __dirname, '../test-data'
@@ -367,34 +367,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "toytrain demo" ] = ( T, done ) ->
-  @_procure_test_files()
-  require 'pipedreams/lib/plugin-tsv'
-  read_sims = ->
-    path  = PATH.resolve __dirname, '../test-data', 'sims.tsv'
-    whisper path
-    input = D.new_stream { path, }
-    input
-      .pipe D.$split_tsv()
-      .pipe $ ( record, send ) ->
-        [ _, target, _, source, ] = record
-        send [ target, source, ]
-      .pipe $ ( record, send ) ->
-        [ target, source, ] = record
-        source = source.replace /!.*$/g, ''
-        send [ target, source, ]
-      .pipe D.$show()
-      .pipe $ 'finish', ->
-        done()
-  # cache_sims
-  # write_sims
-  # read_formulas
-  # write_formulas
-  # read_variantusage
-  # write_variantusage
-  read_sims()
-  #.........................................................................................................
-  return null
+@[ "toytrain demo" ] = require './toytrain-demo'
 
 
 #-----------------------------------------------------------------------------------------------------------
@@ -450,6 +423,27 @@ unless module.parent?
     ]
   @_prune()
   @_main()
+
+  test_timer_resolution = ->
+    step ( resume ) ->
+      g = TC.new_cache()
+      now1 = Date.now
+      now = require './monotimestamp'
+      d1 = [ now1(), now1(), now1(), now1(), now1(), now1(), now1(), ]
+      d2 = [ now(), now(), now(), now(), now(), now(), now(), ]
+      help d1
+      help d2
+      t0 = now()
+      yield TC.HELPERS.touch g, 'file::test-data/f.coffee', resume
+      yield TC.HELPERS.touch g, 'file::test-data/g.coffee', resume
+      t1 = now()
+      t_f = ( yield FS.stat 'test-data/f.coffee', resume ).mtime.getTime()
+      t_g = ( yield FS.stat 'test-data/g.coffee', resume ).mtime.getTime()
+      urge t0
+      help t_f
+      help t_g
+      urge t1
+      info CND.truth t0 < t_f < t_g < t1
 
   # debug '5562', JSON.stringify key for key in Object.keys @
 

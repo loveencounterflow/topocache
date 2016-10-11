@@ -21,13 +21,14 @@ D                         = require 'pipedreams'
 { step, }                 = require 'coffeenode-suspend'
 @HELPERS                  = require './helpers'
 @STAMPERS                 = require './stampers'
+@ALIGNERS                 = require './aligners'
+get_monotimestamp         = require './monotimestamp'
 
 
 #===========================================================================================================
 # TOPOCACHE MODEL IMPLEMENTATION
 #-----------------------------------------------------------------------------------------------------------
 @new_cache = ( settings = null ) ->
-  throw new Error "### MEH ###" if settings?[ 'stamper'  ]?
   # stamper = settings?[ 'stamper'  ] ? @HELPERS.stamper
   home = settings?[ 'home' ] ? process.cwd()
   # #.........................................................................................................
@@ -35,15 +36,15 @@ D                         = require 'pipedreams'
   #   throw new Error "expected a function, got a #{type}"
   # unless ( arity = stamper.length ) is 3
   #   throw new Error "expected a function with arity 3, got one with arity #{arity}"
-  ### TAINT makeshift solution; should allow setting stampers: ###
-  stampers = Object.assign {}, @STAMPERS
+  stampers = Object.assign {}, @STAMPERS, settings?[ 'stampers' ] ? null
+  aligners = Object.assign {}, @ALIGNERS, settings?[ 'aligners' ] ? null
   #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
     'graph':      LTSORT.new_graph loners: no
     'home':       home
     'fixes':      {}
-    'aligners':   {}
+    'aligners':   aligners
     'stampers':   stampers
     'store':      {}
   #.........................................................................................................
@@ -63,7 +64,7 @@ D                         = require 'pipedreams'
 #===========================================================================================================
 # CACHE PROPER
 #-----------------------------------------------------------------------------------------------------------
-@_now = -> +new Date()
+@_now = -> get_monotimestamp()
 
 #-----------------------------------------------------------------------------------------------------------
 @set = ( me, key, value, t0 = null ) ->
@@ -290,7 +291,8 @@ D                         = require 'pipedreams'
     Z       = { runs, t0: new Date(), }
     #.......................................................................................................
     while ( fault = yield @find_first_fault me, resume )?
-      return handler ( new Error "runaway loop?" ), Z if runs.length > max_run_count
+      if runs.length > max_run_count
+        return handler ( new Error "suspecting runaway loop after #{runs.length} runs" ), Z
       #.....................................................................................................
       t0                  = new Date()
       { fix, }            = fault
@@ -301,20 +303,11 @@ D                         = require 'pipedreams'
         return handler error
       #.....................................................................................................
       if ( method = me[ 'aligners' ][ kind ] )?
-        output = yield method me, command, resume
+        output  = yield method me, command, resume
+        output ?= null
       #.....................................................................................................
       else
-        #.....................................................................................................
-        switch kind
-          #...................................................................................................
-          when 'shell'
-            if ( arity = command.length isnt 1 )
-              throw new Error "expected single argument, got #{arity} (#{rpr kind}, #{rpr command})"
-            command = command[ 0 ]
-            output  = yield @HELPERS.shell me, command, resume
-          #...................................................................................................
-          else
-            return handler new Error "unknown kind of fix: #{rpr kind}"
+        return handler new Error "unknown alignment: #{rpr kind}"
       #.....................................................................................................
       t1  = new Date()
       dt  = ( t1 - t0 ) / 1000
