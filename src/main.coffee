@@ -113,7 +113,6 @@ get_monotimestamp         = require './monotimestamp'
 
 #-----------------------------------------------------------------------------------------------------------
 @_kind_and_command_from_fix = ( me, fix ) ->
-  ### TAINT unifiy with keys, see test "fixes can be strings, lists" ###
   switch type = CND.type_of fix
     when 'text'
       kind    = 'text'
@@ -123,8 +122,11 @@ get_monotimestamp         = require './monotimestamp'
     when 'pod'
       { kind, } = fix
       command   = Object.assign {}, fix
+    when 'function'
+      kind    = 'call'
+      command = [ fix, ]
     else
-      throw new Error "expected a text, a list or a POD, got a #{type}"
+      throw new Error "expected a text, a list, a function or a POD, got a #{type}"
   return [ kind, command, ]
 
 

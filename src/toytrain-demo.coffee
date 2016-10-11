@@ -114,27 +114,31 @@ get_read_variantusage_pipeline = ( version ) ->
 module.exports = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
+    t_ = Date.now()
     #.......................................................................................................
-    ### ??? ###
-    read_sims_and_set_cache = ( g, handler ) ->
-      step ( resume ) =>
-        sims = yield read_sims 'A', resume
-        CACHE.set g, 'sim', sims
-        sim_count = ( Object.keys sims ).length
-        whisper "read #{sim_count} SIMs"
-        urge 'faults:', yield CACHE.find_faults g, resume
+    set_cache = ( g, key, method, parameters..., handler ) ->
+      step ( resume ) ->
+        do ( key ) ->
+          for key, { t0, } of g[ 'store' ]
+            urge "#{key}; #{t0 - t_}"
+        whisper "retrieving data for #{key}"
+        result = yield method parameters..., resume
+        debug '33400', key
+        CACHE.set g, key, result
+        # urge 'faults:', yield CACHE.find_faults g, resume
         handler()
         return null
-    ### ??? ###
     #.......................................................................................................
     g = CACHE.new_cache home: PATH.resolve __dirname, '../test-data'
     info "stampers:", ( Object.keys g[ 'stampers' ] ).join ', '
     info "aligners:", ( Object.keys g[ 'aligners' ] ).join ', '
     # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', read_sims, 'A', ]
-    CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', read_sims_and_set_cache, g, ]
+    # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', set_cache, g, 'sim', read_sims, 'A', ]
+    # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', set_cache, g, 'variantusage', read_variantusage, 'A', ]
+    CACHE.register_fix g, 'cache::sim', 'cache::variantusage', ( handler ) -> set_cache g, 'variantusage', read_variantusage, 'A', handler
     CACHE.set g, 'variantusage', 42
     CACHE.set g, 'sim', 42
-    urge 'faults:', yield CACHE.find_faults g, resume
+    # urge 'faults:', yield CACHE.find_faults g, resume
     report = yield CACHE.align g, resume
     info report
     #.......................................................................................................
