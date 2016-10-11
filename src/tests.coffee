@@ -19,6 +19,8 @@ TC                        = require './main'
 LTSORT                    = require 'ltsort'
 PATH                      = require 'path'
 FS                        = require 'fs'
+D                         = require 'pipedreams'
+{ $, $async, }            = D
 { step, }                 = require 'coffeenode-suspend'
 #...........................................................................................................
 test_data_home            = PATH.resolve __dirname, '../test-data'
@@ -365,6 +367,37 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
+@[ "toytrain demo" ] = ( T, done ) ->
+  @_procure_test_files()
+  require 'pipedreams/lib/plugin-tsv'
+  read_sims = ->
+    path  = PATH.resolve __dirname, '../test-data', 'sims.tsv'
+    whisper path
+    input = D.new_stream { path, }
+    input
+      .pipe D.$split_tsv()
+      .pipe $ ( record, send ) ->
+        [ _, target, _, source, ] = record
+        send [ target, source, ]
+      .pipe $ ( record, send ) ->
+        [ target, source, ] = record
+        source = source.replace /!.*$/g, ''
+        send [ target, source, ]
+      .pipe D.$show()
+      .pipe $ 'finish', ->
+        done()
+  # cache_sims
+  # write_sims
+  # read_formulas
+  # write_formulas
+  # read_variantusage
+  # write_variantusage
+  read_sims()
+  #.........................................................................................................
+  return null
+
+
+#-----------------------------------------------------------------------------------------------------------
 @[ "toposort of fixes" ] = ( T, done ) ->
   throw new Error "test not ready"
   step ( resume ) =>
@@ -402,16 +435,17 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    "create cache object"
-    "register file objects"
-    "register file objects with complex keys"
-    "find fault(s) (1)"
-    "find fault(s) (non-existent file)"
-    "find single fault"
-    "find multiple faults"
-    "align multiple faults (1)"
-    "align multiple faults (2)"
-    "fixes can be strings, lists"
+    # "create cache object"
+    # "register file objects"
+    # "register file objects with complex keys"
+    # "find fault(s) (1)"
+    # "find fault(s) (non-existent file)"
+    # "find single fault"
+    # "find multiple faults"
+    # "align multiple faults (1)"
+    # "align multiple faults (2)"
+    # "fixes can be strings, lists"
+    "toytrain demo"
     # "toposort of fixes"
     ]
   @_prune()
