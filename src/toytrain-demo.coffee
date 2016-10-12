@@ -118,14 +118,12 @@ module.exports = ( T, done ) ->
     #.......................................................................................................
     set_cache = ( g, key, method, parameters..., handler ) ->
       step ( resume ) ->
-        do ( key ) ->
-          for key, { t0, } of g[ 'store' ]
-            urge "#{key}; #{t0 - t_}"
+        do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
         whisper "retrieving data for #{key}"
         result = yield method parameters..., resume
-        debug '33400', key
         CACHE.set g, key, result
         # urge 'faults:', yield CACHE.find_faults g, resume
+        do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
         handler()
         return null
     #.......................................................................................................
@@ -134,10 +132,16 @@ module.exports = ( T, done ) ->
     info "aligners:", ( Object.keys g[ 'aligners' ] ).join ', '
     # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', read_sims, 'A', ]
     # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', set_cache, g, 'sim', read_sims, 'A', ]
-    # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', set_cache, g, 'variantusage', read_variantusage, 'A', ]
-    CACHE.register_fix g, 'cache::sim', 'cache::variantusage', ( handler ) -> set_cache g, 'variantusage', read_variantusage, 'A', handler
+    fixes = [
+      [ 'cache::base -> cache::sim',          ( handler ) -> set_cache g, 'sim', read_sims, 'A', handler ]
+      [ 'cache::sim -> cache::variantusage',  ( handler ) -> set_cache g, 'variantusage', read_variantusage, 'A', handler ]
+      ]
+    for [ cause_and_effect, fix, ] in fixes
+      [ cause, effect, ] = cause_and_effect.split /\s*->\s*/
+      CACHE.register_fix g, cause, effect, fix
     CACHE.set g, 'variantusage', 42
     CACHE.set g, 'sim', 42
+    CACHE.set g, 'base', null
     # urge 'faults:', yield CACHE.find_faults g, resume
     report = yield CACHE.align g, resume
     info report
