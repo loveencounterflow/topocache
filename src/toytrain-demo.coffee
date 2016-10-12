@@ -118,12 +118,12 @@ module.exports = ( T, done ) ->
     #.......................................................................................................
     set_cache = ( g, key, method, parameters..., handler ) ->
       step ( resume ) ->
-        do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
+        # do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
         whisper "retrieving data for #{key}"
         result = yield method parameters..., resume
         CACHE.set g, key, result
         # urge 'faults:', yield CACHE.find_faults g, resume
-        do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
+        # do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
         handler()
         return null
     #.......................................................................................................
@@ -139,9 +139,12 @@ module.exports = ( T, done ) ->
     for [ cause_and_effect, fix, ] in fixes
       [ cause, effect, ] = cause_and_effect.split /\s*->\s*/
       CACHE.register_fix g, cause, effect, fix
-    CACHE.set g, 'variantusage', 42
-    CACHE.set g, 'sim', 42
-    CACHE.set g, 'base', null
+    for box in ( CACHE.get_boxed_chart g ).reverse()
+      for entry in box
+        [ kind, key, ] = entry.split '::'
+        ### TAINT use `CACHE.touch` ###
+        continue unless kind is 'cache'
+        debug key, CACHE.set g, key, null
     # urge 'faults:', yield CACHE.find_faults g, resume
     report = yield CACHE.align g, resume
     info report
