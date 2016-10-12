@@ -38,7 +38,7 @@ read_sims = ( version, handler ) ->
   whisper "reading #{path}"
   input
     .pipe D.new_stream pipeline: get_read_sims_pipeline version
-      # .pipe D.$show()
+    .pipe D.$show()
     .pipe $ ( collector ) -> Z = collector
     .pipe $ 'finish', -> handler null, Z
   return null
@@ -52,7 +52,7 @@ read_variantusage = ( version, handler ) ->
   whisper "reading #{path}"
   input
     .pipe D.new_stream pipeline: get_read_variantusage_pipeline version
-    # .pipe D.$show()
+    .pipe D.$show()
     .pipe $ ( collector ) -> Z = collector
     .pipe $ 'finish', -> handler null, Z
   return null
@@ -105,10 +105,8 @@ get_read_variantusage_pipeline = ( version ) ->
   R.push $ ( [ line, ], send ) -> send line
   R.push $ (   line,    send ) -> send line.split /\s+/
   R.push $ ( entries,   send ) -> send ( ( entry.split /([^a-zA-Z]+)/ )[ 1 .. 2 ] for entry in entries )
-  R.push D.$show()
   #.........................................................................................................
   return R
-
 
 #-----------------------------------------------------------------------------------------------------------
 module.exports = ( T, done ) ->
@@ -145,9 +143,10 @@ module.exports = ( T, done ) ->
         ### TAINT use `CACHE.touch` ###
         continue unless kind is 'cache'
         debug key, CACHE.set g, key, null
-    # urge 'faults:', yield CACHE.find_faults g, resume
-    report = yield CACHE.align g, resume
-    info report
+    urge 'chart:', CACHE.get_boxed_chart g
+    urge 'faults:', yield CACHE.find_faults g, resume
+    report = yield CACHE.align g, { report: yes, progress: yes, }, resume
+    # info report
     #.......................................................................................................
     # cache_sims
     # yield write_sims,         resume

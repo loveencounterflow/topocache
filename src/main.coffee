@@ -10,8 +10,9 @@ debug                     = CND.get_logger 'debug',     badge
 # info                      = CND.get_logger 'info',      badge
 warn                      = CND.get_logger 'warn',      badge
 help                      = CND.get_logger 'help',      badge
+urge                      = CND.get_logger 'urge',      badge
 alert                     = CND.get_logger 'alert',     badge
-# whisper                   = CND.get_logger 'whisper',   badge
+whisper                   = CND.get_logger 'whisper',   badge
 # echo                      = CND.echo.bind CND
 #...........................................................................................................
 LTSORT                    = require 'ltsort'
@@ -48,14 +49,7 @@ get_monotimestamp         = require './monotimestamp'
     'stampers':   stampers
     'store':      {}
   #.........................................................................................................
-  @_reset_chart R
   return R
-
-#-----------------------------------------------------------------------------------------------------------
-@_reset_chart = ( me ) ->
-  me[ 'boxed-chart'   ] = null
-  me[ 'indexed-chart' ] = null
-  return null
 
 #-----------------------------------------------------------------------------------------------------------
 @_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
@@ -140,7 +134,6 @@ get_monotimestamp         = require './monotimestamp'
   relation                = { cause, effect, fix, }
   me[ 'fixes' ][ rc_key ] = relation
   LTSORT.add me[ 'graph' ], cause, effect
-  @_reset_chart me
   return null
 
 #-----------------------------------------------------------------------------------------------------------
@@ -175,18 +168,15 @@ get_monotimestamp         = require './monotimestamp'
 
 #-----------------------------------------------------------------------------------------------------------
 @get_boxed_chart = ( me ) ->
-  return R if ( R = me[ 'boxed-chart' ] )?
-  # LTSORT.linearize me[ 'graph' ]
   R = []
   for box in LTSORT.group me[ 'graph' ]
     target = []
     R.push ( key for key in box )
-  return me[ 'boxed-chart' ] = R
+  return R
 
 #-----------------------------------------------------------------------------------------------------------
 @get_indexed_chart = ( me ) ->
-  return R if ( R = me[ 'indexed-chart' ] )?
-  return me[ 'indexed-chart' ] = @_indexed_from_boxed_series me, @get_boxed_chart me
+  return @_indexed_from_boxed_series me, @get_boxed_chart me
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
@@ -286,18 +276,35 @@ get_monotimestamp         = require './monotimestamp'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@align = ( me, handler ) =>
+@align = ( me, settings = null, handler ) =>
+  switch arity = arguments.length
+    when 2
+      handler   = settings
+      settings  = null
+    when 3
+      null
+    else throw new Error "expected 2 or 3 arguments, got #{arity}"
+  #.........................................................................................................
+  report    = settings?[ 'report'   ] ? no
+  progress  = settings?[ 'progress' ] ? no
+  #.........................................................................................................
+  runs          = []
+  run_count     = 0
+  Z             = { runs, t0: new Date(), }
   max_run_count = ( Object.keys me[ 'fixes' ] ).length * 2
+  #.........................................................................................................
+  if progress
+    urge '33442', "chart:", @get_boxed_chart me
+  #.........................................................................................................
   step ( resume ) =>
-    runs    = []
-    Z       = { runs, t0: new Date(), }
     #.......................................................................................................
     while ( fault = yield @find_first_fault me, resume )?
-      if runs.length > max_run_count
-        return handler ( new Error "suspecting runaway loop after #{runs.length} runs" ), Z
+      run_count += +1
+      if run_count > max_run_count
+        return handler ( new Error "suspecting runaway loop after #{run_count} runs" ), Z
       #.....................................................................................................
-      t0                  = new Date()
-      { fix, }            = fault
+      t0                      = new Date()
+      { cause, effect, fix, } = fault
       #.....................................................................................................
       try
         [ kind, command, ] = @_kind_and_command_from_fix me, fix
@@ -305,6 +312,10 @@ get_monotimestamp         = require './monotimestamp'
         return handler error
       #.....................................................................................................
       if ( method = me[ 'aligners' ][ kind ] )?
+      #.....................................................................................................
+        if progress
+          debug '33442', "trend:", yield @fetch_boxed_trend me, resume
+          whisper "align: run ##{runs.length + 1} #{cause} -> #{effect}"
         output  = yield method me, command, resume
         output ?= null
       #.....................................................................................................
@@ -314,10 +325,19 @@ get_monotimestamp         = require './monotimestamp'
       t1  = new Date()
       dt  = ( t1 - t0 ) / 1000
       run = Object.assign {}, fault, { kind, command, output, t0, t1, dt, }
+      if progress
+        whisper "align: run ##{runs.length + 1} #{cause} -> #{effect} completed after #{dt.toFixed 3}s"
       runs.push run
     #.......................................................................................................
     Z[ 't1' ] = new Date()
     Z[ 'dt' ] = ( Z[ 't1' ] - Z[ 't0' ] ) / 1000
+    #.......................................................................................................
+    if report
+      for run, run_idx in runs
+        { cause, effect, dt, output, } = run
+        help "align: run ##{run_idx + 1} #{cause} -> #{effect} completed after #{dt.toFixed 3}s"
+      help "align: took #{Z[ 'dt' ].toFixed 3}s"
+    #.......................................................................................................
     handler null, Z
   #.........................................................................................................
   return null
