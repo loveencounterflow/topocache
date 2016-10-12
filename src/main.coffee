@@ -221,6 +221,16 @@ get_monotimestamp         = require './monotimestamp'
     R[ name ] = box_idx for name in box
   return R
 
+#-----------------------------------------------------------------------------------------------------------
+@_boxed_series_as_vertical_rpr = ( me, title, boxed_series ) ->
+  R = []
+  R.push '\n'
+  R.push '│   ' + title
+  for box in boxed_series
+    R.push '├─  ' + box.join ' '
+  R.push '▼'
+  return R.join '\n'
+
 
 #===========================================================================================================
 # FAULT-FINDING
@@ -293,8 +303,8 @@ get_monotimestamp         = require './monotimestamp'
   Z             = { runs, t0: new Date(), }
   max_run_count = ( Object.keys me[ 'fixes' ] ).length * 2
   #.........................................................................................................
-  if progress
-    urge '33442', "chart:", @get_boxed_chart me
+  # if progress
+  #   urge '33442', "chart:", @get_boxed_chart me
   #.........................................................................................................
   step ( resume ) =>
     #.......................................................................................................
@@ -314,7 +324,7 @@ get_monotimestamp         = require './monotimestamp'
       if ( method = me[ 'aligners' ][ kind ] )?
       #.....................................................................................................
         if progress
-          debug '33442', "trend:", yield @fetch_boxed_trend me, resume
+          urge @_boxed_series_as_vertical_rpr me, 'trend', yield @fetch_boxed_trend me, resume
           whisper "align: run ##{runs.length + 1} #{cause} -> #{effect}"
         output  = yield method me, command, resume
         output ?= null

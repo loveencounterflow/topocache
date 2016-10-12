@@ -30,28 +30,28 @@ CACHE                     = require './main'
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-read_sims = ( version, handler ) ->
+read_sims = ( S, version, handler ) ->
   throw new Error "unknown version #{rpr version}" unless version in [ 'A', 'B', ]
   path  = PATH.resolve __dirname, '../test-data', 'sims.txt'
   input = D.new_stream { path, }
   Z     = null
   whisper "reading #{path}"
   input
-    .pipe D.new_stream pipeline: get_read_sims_pipeline version
+    .pipe D.new_stream pipeline: get_read_sims_pipeline S, version
     .pipe D.$show()
     .pipe $ ( collector ) -> Z = collector
     .pipe $ 'finish', -> handler null, Z
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-read_variantusage = ( version, handler ) ->
+read_variantusage = ( S, version, handler ) ->
   throw new Error "unknown version #{rpr version}" unless version in [ 'A', ] # 'B', ]
   path  = PATH.resolve __dirname, '../test-data', 'variants-and-usages.txt'
   input = D.new_stream { path, }
   Z     = null
   whisper "reading #{path}"
   input
-    .pipe D.new_stream pipeline: get_read_variantusage_pipeline version
+    .pipe D.new_stream pipeline: get_read_variantusage_pipeline S, version
     .pipe D.$show()
     .pipe $ ( collector ) -> Z = collector
     .pipe $ 'finish', -> handler null, Z
@@ -61,7 +61,7 @@ read_variantusage = ( version, handler ) ->
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-get_read_sims_pipeline = ( version ) ->
+get_read_sims_pipeline = ( S, version ) ->
   throw new Error "unknown version #{rpr version}" unless version in [ 'A', 'B', ]
   Z = {}
   R = []
@@ -91,7 +91,7 @@ get_read_sims_pipeline = ( version ) ->
   return R
 
 #-----------------------------------------------------------------------------------------------------------
-get_read_variantusage_pipeline = ( version ) ->
+get_read_variantusage_pipeline = ( S, version ) ->
   throw new Error "unknown version #{rpr version}" unless version in [ 'A', ] # 'B', ]
   Z = {}
   R = []
@@ -112,41 +112,39 @@ get_read_variantusage_pipeline = ( version ) ->
 module.exports = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    t_ = Date.now()
+    S = {}
     #.......................................................................................................
-    set_cache = ( g, key, method, parameters..., handler ) ->
+    set_cache = ( S, key, method, parameters..., handler ) ->
       step ( resume ) ->
-        # do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
         whisper "retrieving data for #{key}"
         result = yield method parameters..., resume
-        CACHE.set g, key, result
-        # urge 'faults:', yield CACHE.find_faults g, resume
-        # do ( key ) -> urge "#{key}; #{(t0 - t_).toFixed 3}" for key, { t0, } of g[ 'store' ]
+        CACHE.set S.cache, key, result
         handler()
         return null
+      return null
     #.......................................................................................................
-    g = CACHE.new_cache home: PATH.resolve __dirname, '../test-data'
-    info "stampers:", ( Object.keys g[ 'stampers' ] ).join ', '
-    info "aligners:", ( Object.keys g[ 'aligners' ] ).join ', '
-    # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', read_sims, 'A', ]
-    # CACHE.register_fix g, 'cache::sim', 'cache::variantusage', [ 'call', set_cache, g, 'sim', read_sims, 'A', ]
+    S.cache = CACHE.new_cache home: PATH.resolve __dirname, '../test-data'
+    info "stampers:", ( Object.keys S.cache[ 'stampers' ] ).join ', '
+    info "aligners:", ( Object.keys S.cache[ 'aligners' ] ).join ', '
     fixes = [
-      [ 'cache::base -> cache::sim',          ( handler ) -> set_cache g, 'sim', read_sims, 'A', handler ]
-      [ 'cache::sim -> cache::variantusage',  ( handler ) -> set_cache g, 'variantusage', read_variantusage, 'A', handler ]
+      [ 'cache::base -> cache::sim',          ( handler ) -> set_cache S, 'sim', read_sims, S, 'A', handler ]
+      [ 'cache::sim -> cache::variantusage',  ( handler ) -> set_cache S, 'variantusage', read_variantusage, S, 'A', handler ]
       ]
+    #.......................................................................................................
     for [ cause_and_effect, fix, ] in fixes
       [ cause, effect, ] = cause_and_effect.split /\s*->\s*/
-      CACHE.register_fix g, cause, effect, fix
-    for box in ( CACHE.get_boxed_chart g ).reverse()
+      CACHE.register_fix S.cache, cause, effect, fix
+    #.......................................................................................................
+    ### make this a topocache method ###
+    for box in ( CACHE.get_boxed_chart S.cache ).reverse()
       for entry in box
         [ kind, key, ] = entry.split '::'
         ### TAINT use `CACHE.touch` ###
         continue unless kind is 'cache'
-        debug key, CACHE.set g, key, null
-    urge 'chart:', CACHE.get_boxed_chart g
-    urge 'faults:', yield CACHE.find_faults g, resume
-    report = yield CACHE.align g, { report: yes, progress: yes, }, resume
-    # info report
+        debug key, CACHE.set S.cache, key, null
+    #.......................................................................................................
+    urge 'chart:', CACHE._boxed_series_as_vertical_rpr S.cache, 'chart', CACHE.get_boxed_chart S.cache
+    report = yield CACHE.align S.cache, { report: yes, progress: yes, }, resume
     #.......................................................................................................
     # cache_sims
     # yield write_sims,         resume
@@ -157,15 +155,15 @@ module.exports = ( T, done ) ->
     # sims = yield read_sims_version_A resume
     f = ->
       #.......................................................................................................
-      sims                = yield read_sims 'A', resume
+      sims                = yield read_sims S, 'A', resume
       sim_count           = ( Object.keys sims ).length
       whisper "read #{sim_count} SIMs"
       #.......................................................................................................
-      sims                = yield read_sims 'B', resume
+      sims                = yield read_sims S, 'B', resume
       sim_count           = ( Object.keys sims ).length
       whisper "read #{sim_count} SIMs"
       #.......................................................................................................
-      variantusage        = yield read_variantusage 'A', resume
+      variantusage        = yield read_variantusage S, 'A', resume
       variantusage_count  = ( Object.keys variantusage ).length
       whisper "read #{variantusage_count} entries for variants & usages"
     #.......................................................................................................
