@@ -21,7 +21,7 @@ D                         = require 'pipedreams'
 { $, $async, }            = D
 { step, }                 = require 'coffeenode-suspend'
 @HELPERS                  = require './helpers'
-@STAMPERS                 = require './stampers'
+@MONITORS                 = require './monitors'
 @ALIGNERS                 = require './aligners'
 get_monotimestamp         = require './monotimestamp'
 
@@ -37,7 +37,7 @@ get_monotimestamp         = require './monotimestamp'
   #   throw new Error "expected a function, got a #{type}"
   # unless ( arity = stamper.length ) is 3
   #   throw new Error "expected a function with arity 3, got one with arity #{arity}"
-  stampers = Object.assign {}, @STAMPERS, settings?[ 'stampers' ] ? null
+  monitors = Object.assign {}, @MONITORS, settings?[ 'monitors' ] ? null
   aligners = Object.assign {}, @ALIGNERS, settings?[ 'aligners' ] ? null
   #.........................................................................................................
   R =
@@ -46,7 +46,7 @@ get_monotimestamp         = require './monotimestamp'
     'home':       home
     'fixes':      {}
     'aligners':   aligners
-    'stampers':   stampers
+    'monitors':   monitors
     'store':      {}
   #.........................................................................................................
   return R
@@ -162,7 +162,7 @@ get_monotimestamp         = require './monotimestamp'
 #-----------------------------------------------------------------------------------------------------------
 @stamp = ( me, key, handler ) ->
   [ protocol, path, ] = @split_key me, key
-  unless ( stamper = me[ 'stampers' ][ protocol ] )?
+  unless ( stamper = me[ 'monitors' ][ protocol ] )?
     return handler new Error "no stamper for protocol #{rpr protocol}"
   stamper me, path, handler
 
@@ -201,6 +201,8 @@ get_monotimestamp         = require './monotimestamp'
       return -1 if a < b
       return  0
     ( Z.push collector.get timestamp ) for timestamp in timestamps
+    debug '30112', collector
+    debug '30112', timestamps
     handler null, Z
   #.........................................................................................................
   return null
