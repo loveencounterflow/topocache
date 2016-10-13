@@ -9,6 +9,11 @@
 * **Chart** and **Trend**
 * **Align**
 
+* **Stampers**
+  stamp readers
+  stamp writers
+  monitors
+
 ## Artefacts
 
 * (local, physical, reified) Data Sources (a.k.a. 'flat files', 'text files')

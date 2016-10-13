@@ -159,6 +159,7 @@ module.exports = ( T, done ) ->
     info "aligners:", ( Object.keys S.cache[ 'aligners' ] ).join ', '
     fixes = [
       [ 'cache::base -> cache::sims',          ( handler ) -> set_cache S, 'sims', read_sims, S, 'A', handler ]
+      # [ 'cache::base -> cache::sims',          ( handler ) -> set_cache S, 'sims', read_sims, S, 'B', handler ]
       [ 'cache::sims -> cache::variantusage',  ( handler ) -> set_cache S, 'variantusage', read_variantusage, S, 'A', handler ]
       ]
     #.......................................................................................................
