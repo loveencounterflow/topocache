@@ -24,10 +24,12 @@
   "author": "loveencounterflow",
   "license": "MIT",
   "dependencies": {
+    "chokidar": "^1.6.0",
     "cnd": "^4.2.0",
     "coffee-script": "^1.11.1",
     "coffeenode-suspend": "^0.1.11",
     "ltsort": "^1.1.5",
-    "pipedreams": "^6.3.0"
+    "pipedreams": "^6.3.0",
+    "sse4_crc32": "^5.1.1"
   }
 }

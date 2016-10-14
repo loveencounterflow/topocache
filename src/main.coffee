@@ -24,6 +24,8 @@ D                         = require 'pipedreams'
 @MONITORS                 = require './monitors'
 @ALIGNERS                 = require './aligners'
 get_monotimestamp         = require './monotimestamp'
+@FILEWATCHER              = require './filewatcher'
+@FILEWATCHER.main()
 
 
 #===========================================================================================================
@@ -232,6 +234,15 @@ get_monotimestamp         = require './monotimestamp'
     R.push '├─  ' + box.join ' '
   R.push '▼'
   return R.join '\n'
+
+
+#===========================================================================================================
+#
+#-----------------------------------------------------------------------------------------------------------
+@get_ids        = ( me ) -> Array.from me[ 'graph' ][ 'precedents' ].keys()
+@get_file_ids   = ( me ) -> ( id for id in ( @get_ids me ) when id.startsWith 'file::' )
+@get_file_paths = ( me ) -> ( id.replace /^file::/, '' for id in ( @get_file_ids me ) )
+
 
 
 #===========================================================================================================

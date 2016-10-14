@@ -379,6 +379,26 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 
 
 #-----------------------------------------------------------------------------------------------------------
+@[ "catalog" ] = ( T, done ) ->
+  # f = ->
+  #   @compile_catalog = ( me, handler ) ->
+  #     step ( resume ) =>
+  #       for path in paths
+  # f.apply TC.FILEWATCHER
+  step ( resume ) =>
+    home = PATH.resolve __dirname, '../test-data'
+    g = TC.new_cache { home, }
+    #.......................................................................................................
+    TC.register_fix g, 'x::foo',  'x::bar'
+    TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
+    TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', 'coffee -c g.coffee', ]
+    TC.register_fix g, 'file::f.coffee',  'file::f.js', 'shell::coffee -c g.coffee'
+    debug TC.get_ids        g
+    debug TC.get_file_ids   g
+    debug TC.get_file_paths g
+    done()
+
+#-----------------------------------------------------------------------------------------------------------
 @[ "toposort of fixes" ] = ( T, done ) ->
   throw new Error "test not ready"
   step ( resume ) =>
@@ -416,10 +436,10 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    "create cache object"
-    "register file objects"
-    "register file objects with complex keys"
-    "find fault(s) (1)"
+    # "create cache object"
+    # "register file objects"
+    # "register file objects with complex keys"
+    # "find fault(s) (1)"
     # "find fault(s) (non-existent file)"
     # "find single fault"
     # "find multiple faults"
@@ -427,10 +447,12 @@ unless module.parent?
     # "align multiple faults (2)"
     # "fixes can be strings, lists"
     # "toytrain demo"
+    "catalog"
     # # "toposort of fixes"
     ]
   @_prune()
-  @_main()
+  # @_main()
+  @[ "catalog" ]()
 
   test_timer_resolution = ->
     step ( resume ) ->
