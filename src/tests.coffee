@@ -380,11 +380,17 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "catalog" ] = ( T, done ) ->
-  # f = ->
-  #   @compile_catalog = ( me, handler ) ->
-  #     step ( resume ) =>
-  #       for path in paths
-  # f.apply TC.FILEWATCHER
+  f = ->
+    @compile_catalog = ( me, handler ) ->
+      Z = {}
+      step ( resume ) =>
+        for path in TC.get_file_paths me
+          locator   = TC.locator_from_path me, path
+          checksum  = yield @checksum_from_path me, locator, 0, resume
+          Z[ path ] = { path, checksum, }
+        handler null, Z
+      return null
+  f.apply TC.FILEWATCHER
   step ( resume ) =>
     home = PATH.resolve __dirname, '../test-data'
     g = TC.new_cache { home, }
@@ -393,9 +399,19 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
     TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', 'coffee -c g.coffee', ]
     TC.register_fix g, 'file::f.coffee',  'file::f.js', 'shell::coffee -c g.coffee'
-    debug TC.get_ids        g
-    debug TC.get_file_ids   g
-    debug TC.get_file_paths g
+    TC.register_fix g, 'file::this-file-doesnt-exist.txt',  'x::bar'
+    TC.register_fix g, 'file::a.json',                      'x::bar'
+    TC.register_fix g, 'file::f.coffee',                    'x::bar'
+    TC.register_fix g, 'file::f.js',                        'x::bar'
+    TC.register_fix g, 'file::g.coffee',                    'x::bar'
+    TC.register_fix g, 'file::g.js',                        'x::bar'
+    TC.register_fix g, 'file::sims.txt',                    'x::bar'
+    TC.register_fix g, 'file::variants-and-usages.txt',     'x::bar'
+    # debug TC.get_ids          g
+    # debug TC.get_file_ids     g
+    # debug TC.get_file_paths   g
+    # debug TC.get_boxed_chart  g
+    debug yield TC.FILEWATCHER.compile_catalog g, resume
     done()
 
 #-----------------------------------------------------------------------------------------------------------
@@ -451,8 +467,10 @@ unless module.parent?
     # # "toposort of fixes"
     ]
   @_prune()
-  # @_main()
-  @[ "catalog" ]()
+  @_main()
+  # @[ "catalog" ]()
+
+
 
   test_timer_resolution = ->
     step ( resume ) ->

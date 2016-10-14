@@ -239,9 +239,11 @@ get_monotimestamp         = require './monotimestamp'
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-@get_ids        = ( me ) -> Array.from me[ 'graph' ][ 'precedents' ].keys()
-@get_file_ids   = ( me ) -> ( id for id in ( @get_ids me ) when id.startsWith 'file::' )
-@get_file_paths = ( me ) -> ( id.replace /^file::/, '' for id in ( @get_file_ids me ) )
+@get_ids            = ( me        ) -> Array.from me[ 'graph' ][ 'precedents' ].keys()
+@get_file_ids       = ( me        ) -> ( id for id in ( @get_ids me ) when id.startsWith 'file::' )
+@get_file_paths     = ( me        ) -> ( id.replace /^file::/, '' for id in ( @get_file_ids me ) )
+@get_file_locators  = ( me        ) -> ( @locator_from_path me, path for path in @get_file_paths me )
+@locator_from_path  = ( me, path  ) -> PATH.resolve me[ 'home' ], path
 
 
 
