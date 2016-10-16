@@ -22,6 +22,7 @@ Crc32                     = require 'sse4_crc32'
 TC                        = require './main'
 D                         = require 'pipedreams'
 { $, $async, }            = D
+{ step, }                 = require 'coffeenode-suspend'
 
 
 #===========================================================================================================
@@ -29,7 +30,9 @@ D                         = require 'pipedreams'
 #-----------------------------------------------------------------------------------------------------------
 @main = ->
   watcher = CKD.watch()
-  watcher.add PATH.resolve __dirname, '..', 'test-data'
+  path    = PATH.resolve __dirname, '..', 'test-data'
+  debug '99031', "file watcher: #{path}"
+  watcher.add path
   watcher.on 'change', ( path, nfo ) =>
     info ( get_monotimestamp().toFixed 3 ), CND.steel 'change:', path
   # watcher.on 'add',       ( P... ) => info Date.now(), CND.rainbow 'add:        ', JSON.stringify P
@@ -69,8 +72,49 @@ D                         = require 'pipedreams'
       handler null, crc32.crc()
   return null
 
+#-----------------------------------------------------------------------------------------------------------
+@_get_crc = ( text ) -> Crc32.calculate text
+
+#-----------------------------------------------------------------------------------------------------------
+@compile_catalog = ( me, handler ) ->
+  Z = {}
+  step ( resume ) =>
+    for path in TC.get_file_paths me
+      locator   = TC.locator_from_path me, path
+      checksum  = yield @checksum_from_path me, locator, 0, resume
+      Z[ path ] = { path, checksum, }
+    handler null, Z
+  return null
+
+#-----------------------------------------------------------------------------------------------------------
+@$add_crc = ( me, fallback ) ->
+  return $async ( nfo ) =>
+    step ( resume ) =>
+      { path }          = nfo
+      locator           = TC.locator_from_path me, path
+      nfo[ 'checksum' ] = yield @checksum_from_path me, locator, fallback, resume
+      return null
+    return null
 
 
 ############################################################################################################
-unless module.parent?
-  @main()
+@_default_catalog_home = PATH.resolve "/tmp/topocache-catalog-#{@_get_crc __dirname}"
+try
+  ( require 'fs' ).mkdirSync @_default_catalog_home
+catch error
+  throw error unless error[ 'code' ] is 'EEXIST'
+
+
+# ############################################################################################################
+# unless module.parent?
+@main()
+
+
+
+
+
+
+
+
+
+

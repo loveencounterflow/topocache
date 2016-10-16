@@ -90,7 +90,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 @[ "register file objects" ] = ( T, done ) ->
   step ( resume ) =>
     @_procure_test_files()
-    home        = PATH.resolve __dirname, '../test-data'
+    home        = test_data_home
     g           = TC.new_cache { home, }
     TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c test-data'
     # debug '30020', g
@@ -106,7 +106,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "register file objects with complex keys" ] = ( T, done ) ->
   @_procure_test_files()
-  home        = PATH.resolve __dirname, '../test-data'
+  home        = test_data_home
   g           = TC.new_cache { home, }
   T.throws "expected a text, got a list", -> TC.register_fix g, [ 'file', 'f.coffee', ], [ 'file', 'f.js', ], [ 'shell', 'coffee -c test-data', ]
   urge '55444', g
@@ -119,7 +119,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   step ( resume ) =>
     @_procure_test_files()
     #.......................................................................................................
-    home        = PATH.resolve __dirname, '../test-data'
+    home        = test_data_home
     g           = TC.new_cache { home, }
     yield TC.HELPERS.touch g, 'file::f.js',     resume; yield @_delay resume
     yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
@@ -146,7 +146,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   step ( resume ) =>
     @_procure_test_files()
     #.......................................................................................................
-    home        = PATH.resolve __dirname, '../test-data'
+    home        = test_data_home
     g           = TC.new_cache { home, }
     yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
     #.......................................................................................................
@@ -177,7 +177,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   step ( resume ) =>
     @_procure_test_files()
     #.......................................................................................................
-    home        = PATH.resolve __dirname, '../test-data'
+    home        = test_data_home
     g           = TC.new_cache { home, }
     yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
     #.......................................................................................................
@@ -206,8 +206,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "find multiple faults" ] = ( T, done ) ->
   step ( resume ) =>
-    home = PATH.resolve __dirname, '../test-data'
-    g = TC.new_cache { home, }
+    g = TC.new_cache { home: test_data_home, }
     @_procure_test_files()
     #.......................................................................................................
     fix_1 = 'shell::coffee -c f.coffee'
@@ -260,7 +259,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "align multiple faults (1)" ] = ( T, done ) ->
   step ( resume ) =>
-    home = PATH.resolve __dirname, '../test-data'
+    home = test_data_home
     g = TC.new_cache { home, }
     @_procure_test_files()
     #.......................................................................................................
@@ -321,7 +320,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "align multiple faults (2)" ] = ( T, done ) ->
   step ( resume ) =>
-    home = PATH.resolve __dirname, '../test-data'
+    home = test_data_home
     g = TC.new_cache { home, }
     @_procure_test_files()
     #.......................................................................................................
@@ -355,7 +354,7 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "fixes can be strings, lists" ] = ( T, done ) ->
   step ( resume ) =>
-    home = PATH.resolve __dirname, '../test-data'
+    home = test_data_home
     g = TC.new_cache { home, }
     #.......................................................................................................
     TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
@@ -377,22 +376,10 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 #-----------------------------------------------------------------------------------------------------------
 @[ "toytrain demo" ] = require './toytrain-demo'
 
-
 #-----------------------------------------------------------------------------------------------------------
 @[ "catalog" ] = ( T, done ) ->
-  f = ->
-    @compile_catalog = ( me, handler ) ->
-      Z = {}
-      step ( resume ) =>
-        for path in TC.get_file_paths me
-          locator   = TC.locator_from_path me, path
-          checksum  = yield @checksum_from_path me, locator, 0, resume
-          Z[ path ] = { path, checksum, }
-        handler null, Z
-      return null
-  f.apply TC.FILEWATCHER
   step ( resume ) =>
-    home = PATH.resolve __dirname, '../test-data'
+    home = test_data_home
     g = TC.new_cache { home, }
     #.......................................................................................................
     TC.register_fix g, 'x::foo',  'x::bar'
@@ -411,14 +398,17 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     # debug TC.get_file_ids     g
     # debug TC.get_file_paths   g
     # debug TC.get_boxed_chart  g
-    debug yield TC.FILEWATCHER.compile_catalog g, resume
+    catalog       = yield TC.FILEWATCHER.compile_catalog g, resume
+    catalog_path  = PATH.resolve TC.FILEWATCHER._default_catalog_home, 'catalog.json'
+    catalog_json  = JSON.stringify catalog, null, '  '
+    yield FS.writeFile catalog_path, catalog_json, resume
     done()
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "toposort of fixes" ] = ( T, done ) ->
   throw new Error "test not ready"
   step ( resume ) =>
-    g = TC.new_cache home: PATH.resolve __dirname, '../test-data'
+    g = TC.new_cache home: test_data_home
     # @_procure_test_files()
     #.......................................................................................................
     fix_1       = [ 'shell', 'coffee -c f.coffee', ]
@@ -452,16 +442,16 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    # "create cache object"
-    # "register file objects"
-    # "register file objects with complex keys"
-    # "find fault(s) (1)"
-    # "find fault(s) (non-existent file)"
-    # "find single fault"
-    # "find multiple faults"
-    # "align multiple faults (1)"
-    # "align multiple faults (2)"
-    # "fixes can be strings, lists"
+    "create cache object"
+    "register file objects"
+    "register file objects with complex keys"
+    "find fault(s) (1)"
+    "find fault(s) (non-existent file)"
+    "find single fault"
+    "find multiple faults"
+    "align multiple faults (1)"
+    "align multiple faults (2)"
+    "fixes can be strings, lists"
     # "toytrain demo"
     "catalog"
     # # "toposort of fixes"
@@ -494,7 +484,7 @@ unless module.parent?
       info CND.truth t0 < t_f < t_g < t1
 
   # debug '5562', JSON.stringify key for key in Object.keys @
-
+  # debug '77500', TC._default_catalog_home
   # CND.run =>
   #   @[ "find multiple faults" ] null, -> warn "not tested"
 
