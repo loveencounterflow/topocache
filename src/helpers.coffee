@@ -49,26 +49,21 @@ D                         = require 'pipedreams'
   output_lines      = []
   settings          = { cwd: me[ 'home' ], }
   cp                = ( require 'child_process' ).spawn command, parameters, settings
-  # record 'shell_command', command, parameters.join ' '
   #.........................................................................................................
   cp.stdout
     .pipe D.$split()
     .pipe $ ( line ) =>
       output_lines.push line
-      # record 'shell_command_result', line
   #.........................................................................................................
   cp.stderr
     .pipe D.$split()
     .pipe $ ( line ) =>
       error_lines.push line
-      # debug '30322', CND.red line
   #.........................................................................................................
   cp.on 'close', ( code ) =>
     message = ''
     #.......................................................................................................
     if error_lines.length > 0
-      # ### TAINT looks like we're getting empty lines on stderr? ###
-      # message = ( line for line in error_lines when line.length > 0 ).join '\n'
       message = ( line for line in error_lines ).join '\n'
     #.......................................................................................................
     if ( code isnt 0 ) or ( message.length > 0 )
@@ -88,6 +83,22 @@ D                         = require 'pipedreams'
   throw new Error "unable to touch using protocol #{protocol}" unless protocol is 'file'
   locator             = PATH.resolve me[ 'home' ], path
   @shell me, "touch #{locator}", handler
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
