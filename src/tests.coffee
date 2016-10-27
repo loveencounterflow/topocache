@@ -323,31 +323,31 @@ templates_home            = PATH.resolve test_data_home, 'templates'
     home = test_data_home
     g = TC.new_cache { home, }
     @_procure_test_files()
-    #.......................................................................................................
-    TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
-    TC.register_fix g, 'file::g.coffee',  'file::g.js', [ 'shell', 'coffee -c g.coffee', ]
-    TC.register_fix g, 'file::g.js',      'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
-    #.......................................................................................................
-    yield TC.HELPERS.touch g, 'file::f.js',     resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'file::g.js',     resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'file::g.coffee', resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
-    # urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
-    # T.eq boxed_trend, [ [ 'file::f.coffee' ], [ 'file::g.coffee' ], [ 'file::f.js' ], [ 'file::g.js' ] ]
-    fault = yield TC.find_first_fault g, resume
-    # debug JSON.stringify fault
-    T.eq fault, {"cause":"file::g.coffee","effect":"file::g.js","fix":["shell","coffee -c g.coffee"]}
-    #.....................................................................................................
-    report = yield TC.align g, resume
-    info report
-    T.eq report[ 'runs' ]?.length, 2
-    T.eq report[ 'runs' ]?[ 0 ]?[ 'cause' ], 'file::g.coffee'
-    T.eq report[ 'runs' ]?[ 1 ]?[ 'cause' ], 'file::f.coffee'
-    T.eq report[ 'runs' ]?[ 0 ]?[ 'kind'  ], 'shell'
-    T.eq report[ 'runs' ]?[ 1 ]?[ 'kind'  ], 'shell'
-    help yield TC.HELPERS.shell g, "ls -l -tr ./", resume
-    # help yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
-    done()
+    # #.......................................................................................................
+    # TC.register_fix g, 'file::f.coffee',  'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
+    # TC.register_fix g, 'file::g.coffee',  'file::g.js', [ 'shell', 'coffee -c g.coffee', ]
+    # TC.register_fix g, 'file::g.js',      'file::f.js', [ 'shell', [ 'coffee', '-c', 'f.coffee', ], ]
+    # #.......................................................................................................
+    # yield TC.HELPERS.touch g, 'file::f.js',     resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'file::g.js',     resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'file::g.coffee', resume; yield @_delay resume
+    # yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
+    # # urge '44300', boxed_trend = yield TC.fetch_boxed_trend g, resume
+    # # T.eq boxed_trend, [ [ 'file::f.coffee' ], [ 'file::g.coffee' ], [ 'file::f.js' ], [ 'file::g.js' ] ]
+    # fault = yield TC.find_first_fault g, resume
+    # # debug JSON.stringify fault
+    # T.eq fault, {"cause":"file::g.coffee","effect":"file::g.js","fix":["shell","coffee -c g.coffee"]}
+    # #.....................................................................................................
+    # report = yield TC.align g, resume
+    # info report
+    # T.eq report[ 'runs' ]?.length, 2
+    # T.eq report[ 'runs' ]?[ 0 ]?[ 'cause' ], 'file::g.coffee'
+    # T.eq report[ 'runs' ]?[ 1 ]?[ 'cause' ], 'file::f.coffee'
+    # T.eq report[ 'runs' ]?[ 0 ]?[ 'kind'  ], 'shell'
+    # T.eq report[ 'runs' ]?[ 1 ]?[ 'kind'  ], 'shell'
+    # help yield TC.HELPERS.shell g, "ls -l -tr ./", resume
+    # # help yield TC.HELPERS.shell g, "ls -l -tr --full-time ./", resume
+    # done()
   #.........................................................................................................
   return null
 
@@ -457,9 +457,9 @@ unless module.parent?
     # # "toposort of fixes"
     ]
   @_prune()
-  @_main()
-  # @[ "catalog" ]()
-
+  # @_main()
+  # T = { eq: ( -> ), }
+  # @[ "align multiple faults (2)" ] T, ->
 
 
   test_timer_resolution = ->
