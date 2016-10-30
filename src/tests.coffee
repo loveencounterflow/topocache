@@ -72,7 +72,7 @@ keep_test_data_folders    = yes
   return source.length
 
 #-----------------------------------------------------------------------------------------------------------
-@_delay = ( handler ) -> setTimeout handler, 10
+@_delay = ( handler ) -> setTimeout handler, 250
 # @_delay = ( handler ) -> setTimeout handler, 1500
 
 #-----------------------------------------------------------------------------------------------------------
@@ -161,22 +161,29 @@ keep_test_data_folders    = yes
   help "ref is #{rpr ref}"
   #.........................................................................................................
   step ( resume ) =>
+    #.......................................................................................................
     settings      = { ref, name: 'cache-example.json', globs: '*', }
     memo          = yield TC.create_memo settings, resume
     g             = TC.new_cache memo
-    yield TC.HELPERS.touch g, 'file::f.js',     resume; yield @_delay resume
-    yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
+    yield TC.FORGETMENOT.force_update g[ 'memo' ],          resume
+    yield TC.HELPERS.touch            g, 'file::f.js',      resume; yield @_delay resume
+    yield TC.HELPERS.touch            g, 'file::f.coffee',  resume; yield @_delay resume
     #.......................................................................................................
     TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c .'
     boxed_chart =         TC.get_boxed_chart g
     boxed_trend = yield TC.fetch_boxed_trend g, resume
-    # first_fault = yield TC.find_first_fault  g, resume
-    # faults      = yield TC.find_faults       g, resume
+    first_fault = yield TC.find_first_fault  g, resume
+    faults      = yield TC.find_faults       g, resume
+    for box in boxed_trend
+      for key in box
+        [ protocol, path, ] = TC.split_key g, key
+        entry               = TC.FORGETMENOT._file_entry_from_path g[ 'memo' ], path
+        info entry[ 'timestamp' ], path
     # help g
     urge JSON.stringify boxed_chart
     urge JSON.stringify boxed_trend
-    # urge JSON.stringify first_fault
-    # urge JSON.stringify faults
+    urge JSON.stringify first_fault
+    urge JSON.stringify faults
     # # T.eq boxed_chart, [["file::f.coffee"],["file::f.js"]]
     # # T.eq boxed_trend, [["file::f.js"],["file::f.coffee"]]
     # # T.eq first_fault, {"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}
@@ -501,8 +508,16 @@ if true
     ]
   @_prune()
   @_main()
+
+    # at Object.__dirname._resolve_paths (/home/flow/io/mingkwai-rack/forgetmenot/lib/main.js:202:22)
+    # at Object.__dirname._get_ref (/home/flow/io/mingkwai-rack/forgetmenot/lib/main.js:218:10)
+    # at Object.__dirname._update (/home/flow/io/mingkwai-rack/forgetmenot/lib/main.js:253:16)
+    # at Object.__dirname.force_update (/home/flow/io/mingkwai-rack/forgetmenot/lib/main.js:247:17)
+    # at /home/flow/io/mingkwai-rack/topocache/lib/tests.js:166:30
+
   # T = { eq: ( -> ), ok: ( -> ), }
-  # @[ "create and use memo object" ] T, ->
+  # CND.run => @[ "find fault(s) (1)" ] T, ->
+
   # f = ( x ) ->
   #   R = x * 2
   #   return R
