@@ -14,6 +14,8 @@ urge                      = CND.get_logger 'urge',      badge
 whisper                   = CND.get_logger 'whisper',   badge
 echo                      = CND.echo.bind CND
 #...........................................................................................................
+mkdirp                    = require 'mkdirp'
+rimraf                    = require 'rimraf'
 test                      = require 'guy-test'
 TC                        = require './main'
 LTSORT                    = require 'ltsort'
@@ -25,6 +27,8 @@ FS                        = require 'fs'
 #...........................................................................................................
 test_data_home            = PATH.resolve __dirname, '../test-data'
 templates_home            = PATH.resolve test_data_home, 'templates'
+keep_test_data_folders    = no
+keep_test_data_folders    = yes
 
 
 #===========================================================================================================
@@ -37,18 +41,28 @@ templates_home            = PATH.resolve test_data_home, 'templates'
   return null
 
 #-----------------------------------------------------------------------------------------------------------
-@_procure_test_files = ->
-  file_count = 0
+@_procure_test_files = ( target_home ) ->
+  file_count            = 0
+  should_remove_folder  = target_home? and target_home isnt '.'
+  target_home           = PATH.resolve test_data_home, target_home ? '.'
+  mkdirp.sync target_home
+  #.........................................................................................................
   for filename in FS.readdirSync templates_home
     file_count += +1
     source_path = PATH.resolve templates_home, filename
-    target_path = PATH.resolve test_data_home, filename
+    target_path = PATH.resolve    target_home, filename
     byte_count  = @_copy_file_sync source_path, target_path
     # whisper """
     #   copied #{byte_count} bytes
     #   from #{source_path}
     #   to   #{target_path}"""
   whisper "copied #{file_count} files"
+  #.........................................................................................................
+  R = ->
+    return if keep_test_data_folders or not should_remove_folder
+    rimraf.sync target_home
+  #.........................................................................................................
+  return R
 
 #-----------------------------------------------------------------------------------------------------------
 @_copy_file_sync = ( source_path, target_path ) ->
@@ -80,6 +94,27 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 
 #===========================================================================================================
 # TESTS
+
+#-----------------------------------------------------------------------------------------------------------
+@[ "create and use memo object" ] = ( T, done ) ->
+  remove_folder = @_procure_test_files 'create and use memo object'
+  # step ( resume ) =>
+  #   settings    = { ref: 'test-data', name: 'cache-example.json' }
+  #   memo        = yield FMN.create_memo settings, resume
+  #   FMN.set memo, 'bar', 42
+  #   key         = FMN.checksum_from_text memo, 'bar'
+  #   { cache, }  = memo
+  #   T.eq ( Object.keys cache ), [ key, ]
+  #   entry       = cache[ key ]
+  #   T.ok CND.is_subset ( Object.keys entry ), [ 'path', 'checksum', 'timestamp', 'status', 'value', ]
+  #   T.eq ( Object.keys entry ).length, 5
+  #   debug '90988', memo
+  #   debug '90988', entry
+  #   T.eq ( FMN.get memo, 'bar' ), 42
+  remove_folder()
+  done()
+  return null
+
 #-----------------------------------------------------------------------------------------------------------
 @[ "create cache object" ] = ( T, done ) ->
   home        = PATH.resolve __dirname, '..'
@@ -442,46 +477,47 @@ templates_home            = PATH.resolve test_data_home, 'templates'
 ############################################################################################################
 unless module.parent?
   include = [
-    "create cache object"
-    "register file objects"
-    "register file objects with complex keys"
-    "find fault(s) (1)"
-    "find fault(s) (non-existent file)"
-    "find single fault"
-    "find multiple faults"
-    "align multiple faults (1)"
-    "align multiple faults (2)"
-    "fixes can be strings, lists"
-    # "toytrain demo"
-    "catalog"
-    # # "toposort of fixes"
+    "create and use memo object"
+    # "create cache object"
+    # "register file objects"
+    # "register file objects with complex keys"
+    # "find fault(s) (1)"
+    # "find fault(s) (non-existent file)"
+    # "find single fault"
+    # "find multiple faults"
+    # "align multiple faults (1)"
+    # "align multiple faults (2)"
+    # "fixes can be strings, lists"
+    # # "toytrain demo"
+    # "catalog"
+    # # # "toposort of fixes"
     ]
   @_prune()
-  # @_main()
+  @_main()
   # T = { eq: ( -> ), }
   # @[ "align multiple faults (2)" ] T, ->
 
 
-  test_timer_resolution = ->
-    step ( resume ) ->
-      g = TC.new_cache()
-      now1 = Date.now
-      now = require './monotimestamp'
-      d1 = [ now1(), now1(), now1(), now1(), now1(), now1(), now1(), ]
-      d2 = [ now(), now(), now(), now(), now(), now(), now(), ]
-      help d1
-      help d2
-      t0 = now()
-      yield TC.HELPERS.touch g, 'file::test-data/f.coffee', resume
-      yield TC.HELPERS.touch g, 'file::test-data/g.coffee', resume
-      t1 = now()
-      t_f = ( yield FS.stat 'test-data/f.coffee', resume ).mtime.getTime()
-      t_g = ( yield FS.stat 'test-data/g.coffee', resume ).mtime.getTime()
-      urge t0
-      help t_f
-      help t_g
-      urge t1
-      info CND.truth t0 < t_f < t_g < t1
+  # test_timer_resolution = ->
+  #   step ( resume ) ->
+  #     g = TC.new_cache()
+  #     now1 = Date.now
+  #     now = require './monotimestamp'
+  #     d1 = [ now1(), now1(), now1(), now1(), now1(), now1(), now1(), ]
+  #     d2 = [ now(), now(), now(), now(), now(), now(), now(), ]
+  #     help d1
+  #     help d2
+  #     t0 = now()
+  #     yield TC.HELPERS.touch g, 'file::test-data/f.coffee', resume
+  #     yield TC.HELPERS.touch g, 'file::test-data/g.coffee', resume
+  #     t1 = now()
+  #     t_f = ( yield FS.stat 'test-data/f.coffee', resume ).mtime.getTime()
+  #     t_g = ( yield FS.stat 'test-data/g.coffee', resume ).mtime.getTime()
+  #     urge t0
+  #     help t_f
+  #     help t_g
+  #     urge t1
+  #     info CND.truth t0 < t_f < t_g < t1
 
   # debug '5562', JSON.stringify key for key in Object.keys @
   # debug '77500', TC._default_catalog_home

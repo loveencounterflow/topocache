@@ -21,15 +21,18 @@ D                         = require 'pipedreams'
 { $, $async, }            = D
 { step, }                 = require 'coffeenode-suspend'
 @HELPERS                  = require './helpers'
-@MONITORS                 = require './monitors'
 @ALIGNERS                 = require './aligners'
 get_monotimestamp         = require './monotimestamp'
-@FILEWATCHER              = require './filewatcher'
-@FILEWATCHER.main()
+# @FORGETMENOT              = require 'forgetmenot'
+@FORGETMENOT              = require '../../forgetmenot'
+
 
 
 #===========================================================================================================
-# TOPOCACHE MODEL IMPLEMENTATION
+#
+#-----------------------------------------------------------------------------------------------------------
+@create_memo = ( P... ) -> @FORGETMENOT.create_memo P...
+
 #-----------------------------------------------------------------------------------------------------------
 @new_cache = ( settings = null ) ->
   # stamper = settings?[ 'stamper'  ] ? @HELPERS.stamper
