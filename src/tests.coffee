@@ -56,11 +56,13 @@ keep_test_data_folders    = yes
     #   copied #{byte_count} bytes
     #   from #{source_path}
     #   to   #{target_path}"""
+  whisper "created 1 folder" if should_remove_folder
   whisper "copied #{file_count} files"
   #.........................................................................................................
   R = ->
     return if keep_test_data_folders or not should_remove_folder
     rimraf.sync target_home
+    whisper "removed 1 folder"
   #.........................................................................................................
   return R
 
@@ -96,11 +98,19 @@ keep_test_data_folders    = yes
 # TESTS
 
 #-----------------------------------------------------------------------------------------------------------
-@[ "create and use memo object" ] = ( T, done ) ->
-  remove_folder = @_procure_test_files 'create and use memo object'
-  # step ( resume ) =>
-  #   settings    = { ref: 'test-data', name: 'cache-example.json' }
-  #   memo        = yield FMN.create_memo settings, resume
+@[ "create and use memo, topo objects" ] = ( T, done ) ->
+  home          = 'create and use memo object'
+  ref           = PATH.join 'test-data', home
+  remove_folder = @_procure_test_files home
+  step ( resume ) =>
+    settings      = { ref, name: 'cache-example.json', globs: '*', }
+    memo          = yield TC.create_memo settings, resume
+    topo          = TC.new_cache memo
+    urge '00980', topo
+    T.ok topo[ 'memo' ] is memo
+    debug '22110', TC.get_boxed_chart topo
+    # debug '22110', TC.get_boxed_trend topo
+    debug '22110', yield TC.fetch_boxed_trend topo, resume
   #   FMN.set memo, 'bar', 42
   #   key         = FMN.checksum_from_text memo, 'bar'
   #   { cache, }  = memo
@@ -111,67 +121,66 @@ keep_test_data_folders    = yes
   #   debug '90988', memo
   #   debug '90988', entry
   #   T.eq ( FMN.get memo, 'bar' ), 42
-  remove_folder()
-  done()
-  return null
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "create cache object" ] = ( T, done ) ->
-  home        = PATH.resolve __dirname, '..'
-  g           = TC.new_cache { home, }
-  done()
-
-#-----------------------------------------------------------------------------------------------------------
-@[ "register file objects" ] = ( T, done ) ->
-  step ( resume ) =>
-    @_procure_test_files()
-    home        = test_data_home
-    g           = TC.new_cache { home, }
-    TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c test-data'
-    # debug '30020', g
-    boxed_chart = TC.get_boxed_chart g
-    urge '55444', boxed_chart
-    urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
-    warn yield TC.find_first_fault  g, resume
-    urge yield TC.find_faults       g, resume
+    remove_folder()
     done()
-  #.........................................................................................................
   return null
 
-#-----------------------------------------------------------------------------------------------------------
-@[ "register file objects with complex keys" ] = ( T, done ) ->
-  @_procure_test_files()
-  home        = test_data_home
-  g           = TC.new_cache { home, }
-  T.throws "expected a text, got a list", -> TC.register_fix g, [ 'file', 'f.coffee', ], [ 'file', 'f.js', ], [ 'shell', 'coffee -c test-data', ]
-  urge '55444', g
-  done()
-  #.........................................................................................................
-  return null
+# #-----------------------------------------------------------------------------------------------------------
+# @[ "register file objects" ] = ( T, done ) ->
+#   step ( resume ) =>
+#     @_procure_test_files()
+#     home        = test_data_home
+#     g           = TC.new_cache { home, }
+#     TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c test-data'
+#     # debug '30020', g
+#     boxed_chart = TC.get_boxed_chart g
+#     urge '55444', boxed_chart
+#     urge '55444', '\n' + rpr yield TC.fetch_boxed_trend g, resume
+#     warn yield TC.find_first_fault  g, resume
+#     urge yield TC.find_faults       g, resume
+#     done()
+#   #.........................................................................................................
+#   return null
+
+# #-----------------------------------------------------------------------------------------------------------
+# @[ "register file objects with complex keys" ] = ( T, done ) ->
+#   @_procure_test_files()
+#   home        = test_data_home
+#   g           = TC.new_cache { home, }
+#   T.throws "expected a text, got a list", -> TC.register_fix g, [ 'file', 'f.coffee', ], [ 'file', 'f.js', ], [ 'shell', 'coffee -c test-data', ]
+#   urge '55444', g
+#   done()
+#   #.........................................................................................................
+#   return null
 
 #-----------------------------------------------------------------------------------------------------------
 @[ "find fault(s) (1)" ] = ( T, done ) ->
+  home          = 'find fault(s) (1)'
+  ref           = PATH.join 'test-data', home
+  remove_folder = @_procure_test_files home
+  help "ref is #{rpr ref}"
+  #.........................................................................................................
   step ( resume ) =>
-    @_procure_test_files()
-    #.......................................................................................................
-    home        = test_data_home
-    g           = TC.new_cache { home, }
+    settings      = { ref, name: 'cache-example.json', globs: '*', }
+    memo          = yield TC.create_memo settings, resume
+    g             = TC.new_cache memo
     yield TC.HELPERS.touch g, 'file::f.js',     resume; yield @_delay resume
     yield TC.HELPERS.touch g, 'file::f.coffee', resume; yield @_delay resume
     #.......................................................................................................
     TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c .'
     boxed_chart =         TC.get_boxed_chart g
     boxed_trend = yield TC.fetch_boxed_trend g, resume
-    first_fault = yield TC.find_first_fault  g, resume
-    faults      = yield TC.find_faults       g, resume
+    # first_fault = yield TC.find_first_fault  g, resume
+    # faults      = yield TC.find_faults       g, resume
+    # help g
     urge JSON.stringify boxed_chart
     urge JSON.stringify boxed_trend
-    urge JSON.stringify first_fault
-    urge JSON.stringify faults
-    # T.eq boxed_chart, [["file::f.coffee"],["file::f.js"]]
-    # T.eq boxed_trend, [["file::f.js"],["file::f.coffee"]]
-    # T.eq first_fault, {"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}
-    # T.eq faults,      [{"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}]
+    # urge JSON.stringify first_fault
+    # urge JSON.stringify faults
+    # # T.eq boxed_chart, [["file::f.coffee"],["file::f.js"]]
+    # # T.eq boxed_trend, [["file::f.js"],["file::f.coffee"]]
+    # # T.eq first_fault, {"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}
+    # # T.eq faults,      [{"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}]
     done()
   #.........................................................................................................
   return null
@@ -475,28 +484,30 @@ keep_test_data_folders    = yes
 
 
 ############################################################################################################
-unless module.parent?
+# unless module.parent?
+if true
   include = [
-    "create and use memo object"
-    # "create cache object"
-    # "register file objects"
-    # "register file objects with complex keys"
-    # "find fault(s) (1)"
-    # "find fault(s) (non-existent file)"
-    # "find single fault"
-    # "find multiple faults"
-    # "align multiple faults (1)"
-    # "align multiple faults (2)"
-    # "fixes can be strings, lists"
-    # # "toytrain demo"
+    "create and use memo, topo objects"
+    "find fault(s) (1)"
+    # # "find fault(s) (non-existent file)"
+    # # "find single fault"
+    # # "find multiple faults"
+    # # "align multiple faults (1)"
+    # # "align multiple faults (2)"
+    # # "fixes can be strings, lists"
+    # # # "toytrain demo"
     # "catalog"
     # # # "toposort of fixes"
     ]
   @_prune()
   @_main()
-  # T = { eq: ( -> ), }
-  # @[ "align multiple faults (2)" ] T, ->
-
+  # T = { eq: ( -> ), ok: ( -> ), }
+  # @[ "create and use memo object" ] T, ->
+  # f = ( x ) ->
+  #   R = x * 2
+  #   return R
+  # debug f 42
+  # setTimeout ( -> log 'ok' ), 1e6
 
   # test_timer_resolution = ->
   #   step ( resume ) ->

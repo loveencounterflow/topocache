@@ -81,8 +81,8 @@ D                         = require 'pipedreams'
   ### TAINT must properly escape path unless you know what you're doing ###
   [ protocol, path, ] = MAIN.split_key me, key
   throw new Error "unable to touch using protocol #{protocol}" unless protocol is 'file'
-  locator             = PATH.resolve me[ 'home' ], path
-  @shell me, "touch #{locator}", handler
+  locator             = MAIN.locator_from_path me, path
+  @shell me, [ 'touch', locator, ], handler
 
 
 

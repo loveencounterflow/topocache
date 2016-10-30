@@ -34,57 +34,61 @@ get_monotimestamp         = require './monotimestamp'
 @create_memo = ( P... ) -> @FORGETMENOT.create_memo P...
 
 #-----------------------------------------------------------------------------------------------------------
-@new_cache = ( settings = null ) ->
+@new_cache = ( settings ) ->
   # stamper = settings?[ 'stamper'  ] ? @HELPERS.stamper
   home = settings?[ 'home' ] ? process.cwd()
-  # #.........................................................................................................
-  # unless ( type = CND.type_of stamper ) is 'function'
-  #   throw new Error "expected a function, got a #{type}"
-  # unless ( arity = stamper.length ) is 3
-  #   throw new Error "expected a function with arity 3, got one with arity #{arity}"
-  monitors = Object.assign {}, @MONITORS, settings?[ 'monitors' ] ? null
-  aligners = Object.assign {}, @ALIGNERS, settings?[ 'aligners' ] ? null
+  #.........................................................................................................
+  unless ( type = CND.type_of settings ) is 'FORGETMENOT/memo'
+    throw new Error "expected an object of type FORGETMENOT/memo, got a #{type}"
+  # monitors = Object.assign {}, @MONITORS, settings?[ 'monitors' ] ? null
+  # aligners = Object.assign {}, @ALIGNERS, settings?[ 'aligners' ] ? null
+  aligners = Object.assign {}, @ALIGNERS
   #.........................................................................................................
   R =
     '~isa':       'TOPOCACHE/cache'
-    'graph':      LTSORT.new_graph loners: no
-    'home':       home
-    'fixes':      {}
-    'aligners':   aligners
-    'monitors':   monitors
-    'store':      {}
+    graph:        LTSORT.new_graph loners: no
+    home:         home
+    fixes:        {}
+    aligners:     aligners
+    # 'monitors':   monitors
+    store:        {}
+    memo:         settings
   #.........................................................................................................
   return R
 
 #-----------------------------------------------------------------------------------------------------------
 @_is_fresh = ( me ) -> me[ 'graph' ][ 'precedents' ].size is 0
 
+#-----------------------------------------------------------------------------------------------------------
+@_now = -> get_monotimestamp()
 
 #===========================================================================================================
 # CACHE PROPER
 #-----------------------------------------------------------------------------------------------------------
-@_now = -> get_monotimestamp()
+@set       = ( me, P... ) -> @FORGETMENOT.set       me[ 'memo' ], P...; return me
+@get       = ( me, P... ) -> @FORGETMENOT.get       me[ 'memo' ], P...
+@get_entry = ( me, P... ) -> @FORGETMENOT.get_entry me[ 'memo' ], P...
 
-#-----------------------------------------------------------------------------------------------------------
-@set = ( me, key, value, t0 = null ) ->
-  t0 ?= @_now()
-  me[ 'store' ][ key ] = { t0, key, value, }
-  return value
+# #-----------------------------------------------------------------------------------------------------------
+# @set = ( me, key, value, t0 = null ) ->
+#   t0 ?= @_now()
+#   me[ 'store' ][ key ] = { t0, key, value, }
+#   return value
 
-#-----------------------------------------------------------------------------------------------------------
-@get = ( me, key ) -> me[ 'store' ][ key ]?[ 'value' ]
+# #-----------------------------------------------------------------------------------------------------------
+# @get = ( me, key ) -> me[ 'store' ][ key ]?[ 'value' ]
 
-#-----------------------------------------------------------------------------------------------------------
-@delete = ( me, key ) -> delete me[ 'store' ][ key ]
+# #-----------------------------------------------------------------------------------------------------------
+# @delete = ( me, key ) -> delete me[ 'store' ][ key ]
 
-#-----------------------------------------------------------------------------------------------------------
-@get_cache_entry = ( me, key ) -> me[ 'store' ][ key ]
+# #-----------------------------------------------------------------------------------------------------------
+# @get_cache_entry = ( me, key ) -> me[ 'store' ][ key ]
 
-#-----------------------------------------------------------------------------------------------------------
-@register_change = ( me, key, t0 = null ) ->
-  t0 ?= @_now()
-  me[ 'store' ][ key ] = { t0, key, }
-  return null
+# #-----------------------------------------------------------------------------------------------------------
+# @register_change = ( me, key, t0 = null ) ->
+#   t0 ?= @_now()
+#   me[ 'store' ][ key ] = { t0, key, }
+#   return null
 
 #-----------------------------------------------------------------------------------------------------------
 @validate_key = ( me, role, key ) ->
@@ -165,11 +169,13 @@ get_monotimestamp         = require './monotimestamp'
 #===========================================================================================================
 #
 #-----------------------------------------------------------------------------------------------------------
-@stamp = ( me, key, handler ) ->
+@timestamp_from_key = ( me, key ) ->
   [ protocol, path, ] = @split_key me, key
-  unless ( stamper = me[ 'monitors' ][ protocol ] )?
-    return handler new Error "no stamper for protocol #{rpr protocol}"
-  stamper me, path, handler
+  switch protocol
+    when 'file'  then entry = @FORGETMENOT._file_entry_from_path  me[ 'memo' ], path
+    when 'cache' then entry = @FORGETMENOT.get_entry              me[ 'memo' ], path
+    else return handler new Error "no stamper for protocol #{rpr protocol}"
+  return entry[ 'timestamp' ]
 
 #-----------------------------------------------------------------------------------------------------------
 @get_boxed_chart = ( me ) ->
@@ -185,32 +191,35 @@ get_monotimestamp         = require './monotimestamp'
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_boxed_trend = ( me, handler ) ->
-  #.........................................................................................................
   step ( resume ) =>
-    Z         = []
-    collector = new Map()
-    #.......................................................................................................
-    for box in @get_boxed_chart me
-      for key in box
-        timestamp = yield @stamp me, key, resume
-        unless CND.isa_number timestamp
-          return handler new Error "expected a number for timestamp of #{rpr key}, got #{rpr timestamp}"
-        unless ( target = collector.get timestamp )?
-          target = []
-          collector.set timestamp, target
-        target.push key
-    #.......................................................................................................
-    timestamps = Array.from collector.keys()
-    timestamps.sort ( a, b ) ->
-      return +1 if a > b
-      return -1 if a < b
-      return  0
-    ( Z.push collector.get timestamp ) for timestamp in timestamps
-    debug '30112', collector
-    debug '30112', timestamps
-    handler null, Z
-  #.........................................................................................................
+    try
+      yield @FORGETMENOT.update me[ 'memo' ], resume
+    catch error
+      handler error
+    handler null, @get_boxed_trend me
   return null
+
+#-----------------------------------------------------------------------------------------------------------
+@get_boxed_trend = ( me, handler ) ->
+  ### Same as `fetch_boxed_trend`, but synchronous and without implicit update of memo object ###
+  R         = []
+  collector = new Map()
+  #.........................................................................................................
+  for box in @get_boxed_chart me
+    for key in box
+      unless ( target = collector.get timestamp )?
+        target = []
+        collector.set timestamp, target
+      target.push key
+  #.........................................................................................................
+  timestamps = Array.from collector.keys()
+  timestamps.sort ( a, b ) ->
+    return +1 if a > b
+    return -1 if a < b
+    return  0
+  ( R.push collector.get timestamp ) for timestamp in timestamps
+  #.........................................................................................................
+  return R
 
 #-----------------------------------------------------------------------------------------------------------
 @fetch_indexed_trend = ( me, handler ) ->
@@ -246,8 +255,8 @@ get_monotimestamp         = require './monotimestamp'
 @get_file_ids       = ( me        ) -> ( id for id in ( @get_ids me ) when id.startsWith 'file::' )
 @get_file_paths     = ( me        ) -> ( id.replace /^file::/, '' for id in ( @get_file_ids me ) )
 @get_file_locators  = ( me        ) -> ( @locator_from_path me, path for path in @get_file_paths me )
-@locator_from_path  = ( me, path  ) -> PATH.resolve me[ 'home' ], path
-
+@get_ref            = ( me        ) -> @FORGETMENOT._get_ref me[ 'memo' ]
+@locator_from_path  = ( me, path  ) -> PATH.resolve ( @get_ref me ), path
 
 
 #===========================================================================================================
