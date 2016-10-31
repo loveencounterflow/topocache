@@ -165,10 +165,11 @@ keep_test_data_folders    = yes
     settings      = { ref, name: 'cache-example.json', globs: '*', }
     memo          = yield TC.create_memo settings, resume
     g             = TC.new_cache memo
-    yield TC.FORGETMENOT.force_update g[ 'memo' ],          resume
-    yield TC.HELPERS.touch            g, 'file::f.js',      resume; yield @_delay resume
     yield TC.HELPERS.touch            g, 'file::f.coffee',  resume; yield @_delay resume
+    yield TC.HELPERS.touch            g, 'file::f.js',      resume; yield @_delay resume
+    yield TC.FORGETMENOT.force_update g[ 'memo' ],          resume
     #.......................................................................................................
+    # debug '33321', memo
     TC.register_fix g, 'file::f.coffee', 'file::f.js', 'shell::coffee -c .'
     boxed_chart =         TC.get_boxed_chart g
     boxed_trend = yield TC.fetch_boxed_trend g, resume
@@ -180,10 +181,10 @@ keep_test_data_folders    = yes
         entry               = TC.FORGETMENOT._file_entry_from_path g[ 'memo' ], path
         info entry[ 'timestamp' ], path
     # help g
-    urge JSON.stringify boxed_chart
-    urge JSON.stringify boxed_trend
-    urge JSON.stringify first_fault
-    urge JSON.stringify faults
+    urge 'boxed_chart: ', JSON.stringify boxed_chart
+    urge 'boxed_trend: ', JSON.stringify boxed_trend
+    urge 'first_fault: ', JSON.stringify first_fault
+    urge 'faults:      ', JSON.stringify faults
     # # T.eq boxed_chart, [["file::f.coffee"],["file::f.js"]]
     # # T.eq boxed_trend, [["file::f.js"],["file::f.coffee"]]
     # # T.eq first_fault, {"cause":"file::f.coffee","effect":"file::f.js","fix":"shell::coffee -c test-data"}

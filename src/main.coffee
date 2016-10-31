@@ -171,10 +171,7 @@ get_monotimestamp         = require './monotimestamp'
 #-----------------------------------------------------------------------------------------------------------
 @timestamp_from_key = ( me, key ) ->
   [ protocol, path, ] = @split_key me, key
-  switch protocol
-    when 'file'  then entry = @FORGETMENOT._file_entry_from_path  me[ 'memo' ], path
-    when 'cache' then entry = @FORGETMENOT.get_entry              me[ 'memo' ], path
-    else return handler new Error "no stamper for protocol #{rpr protocol}"
+  entry               = @FORGETMENOT.get_entry me[ 'memo' ], path
   return entry[ 'timestamp' ]
 
 #-----------------------------------------------------------------------------------------------------------
@@ -204,14 +201,19 @@ get_monotimestamp         = require './monotimestamp'
   ### Same as `fetch_boxed_trend`, but synchronous and without implicit update of memo object ###
   R         = []
   collector = new Map()
+  { memo, } = me
   #.........................................................................................................
   for box in @get_boxed_chart me
     for key in box
+      ### TAINT files should be treated like cache entries at this point ###
+      ### TAINT must put files, cache items into same POD or use key with prepended protocols ###
+      debug key, memo[ 'files' ]?[ key ]?[ 'timestamp' ]
       unless ( target = collector.get timestamp )?
         target = []
         collector.set timestamp, target
       target.push key
   #.........................................................................................................
+  debug '77009', collector
   timestamps = Array.from collector.keys()
   timestamps.sort ( a, b ) ->
     return +1 if a > b
